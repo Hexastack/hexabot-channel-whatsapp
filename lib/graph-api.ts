@@ -1,0 +1,96 @@
+import { HttpService } from '@nestjs/axios';
+import { AxiosRequestConfig } from 'axios';
+import { lastValueFrom, throwError } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+
+import { Whatsapp } from '../types';
+
+export interface GraphRequestOptions {
+  apiVersion?: string;
+  path?: string;
+  qs?: { [key: string]: any };
+  method?: string;
+  payload?: Whatsapp.RequestBody;
+}
+
+export class GraphApi {
+  private graphApiVersion: string = 'v20.0';
+
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly pageToken: string,
+  ) {}
+
+  public getApiVersion(): string {
+    return this.graphApiVersion;
+  }
+
+  public async sendRequest(options: GraphRequestOptions): Promise<any> {
+    const apiVersion = options.apiVersion || this.getApiVersion();
+    const qs = options.qs || {};
+    let uri = 'https://graph.facebook.com';
+
+    if (!options.path) {
+      throw new Error('Valid "path" property required');
+    }
+
+    if (!qs.access_token) {
+      const pageToken = this.pageToken;
+      if (!pageToken) {
+        throw new Error('Page token is not set');
+      }
+      qs.access_token = pageToken;
+    }
+
+    if (apiVersion) {
+      uri += `/${apiVersion}`;
+    }
+
+    uri += `${options.path}`;
+
+    let method: string;
+    if (options.method) {
+      method = options.method.toUpperCase();
+    } else if (options.payload) {
+      method = 'POST';
+    } else {
+      method = 'GET';
+    }
+
+    const axiosConfig: AxiosRequestConfig = {
+      url: uri,
+      method: method as any,
+      params: qs,
+      responseType: 'json',
+    };
+
+    if (options.payload) {
+      if (typeof options.payload !== 'object') {
+        throw new Error('Invalid request payload');
+      }
+      axiosConfig.data = options.payload;
+    }
+
+    return await lastValueFrom(
+      this.httpService.request(axiosConfig).pipe(
+        map((response) => response.data),
+        catchError((error) => {
+          if (error.response && error.response.data) {
+            return throwError(() => error.response.data);
+          }
+          return throwError(() => error);
+        }),
+      ),
+    );
+  }
+
+  //TODO : typage du message
+  public async sendMessage(message: any) {
+    //TODO: delete before push
+    return await this.sendRequest({
+      path: '',
+      payload: message,
+      //formData,
+    });
+  }
+}
