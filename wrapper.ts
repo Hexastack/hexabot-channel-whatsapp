@@ -42,6 +42,24 @@ export default class WhatsappEventWrapper extends EventWrapper<
   WhatsappEventAdapter,
   Whatsapp.Event
 > {
+  _init(event: Whatsapp.Event) {
+    debugger;
+    if (event.value.messages) {
+      if (event.value.messages[0].type === Whatsapp.messageType.text) {
+        this._adapter.eventType = StdEventType.message;
+        this._adapter.messageType = IncomingMessageType.message;
+      }
+    }
+    if (
+      event.value.messages[0].hasOwnProperty('interactive') &&
+      event.value.messages[0].interactive.hasOwnProperty('button_reply')
+    ) {
+      this._adapter.eventType = StdEventType.message;
+      this._adapter.messageType = IncomingMessageType.postback;
+    }
+    this._adapter.raw = event;
+  }
+
   getId(): string {
     if (this._adapter.raw.value.messages[0].id) {
       // console.log('The message id is:', this._adapter.raw.value.messages[0].id);
@@ -99,23 +117,6 @@ export default class WhatsappEventWrapper extends EventWrapper<
    */
   constructor(handler: WhatsappHandler, event: Whatsapp.Event) {
     super(handler, event);
-  }
-
-  _init(event: Whatsapp.Event) {
-    if (event.value.messages) {
-      if (event.value.messages[0].type === Whatsapp.messageType.text) {
-        this._adapter.eventType = StdEventType.message;
-        this._adapter.messageType = IncomingMessageType.message;
-      }
-    }
-    if (
-      event.value.messages[0].hasOwnProperty('interactive') &&
-      event.value.messages[0].interactive.hasOwnProperty('button_reply')
-    ) {
-      this._adapter.eventType = StdEventType.message;
-      this._adapter.messageType = IncomingMessageType.postback;
-    }
-    this._adapter.raw = event;
   }
 
   getChannelData(): any {

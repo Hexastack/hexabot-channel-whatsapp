@@ -1,16 +1,28 @@
+/*
+ * Copyright © 2024 Hexastack. All rights reserved.
+ *
+ * Licensed under the GNU Affero General Public License v3.0 (AGPLv3) with the following additional terms:
+ * 1. The name "Hexabot" is a trademark of Hexastack. You may not use this name in derivative works without express written permission.
+ * 2. All derivative works must include clear attribution to the original creator and software, Hexastack and Hexabot, in a prominent location (e.g., in the software's "About" section, documentation, and README file).
+ */
+
 import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Request, Response } from 'express';
 
+import { Attachment } from '@/attachment/schemas/attachment.schema';
 import { AttachmentService } from '@/attachment/services/attachment.service';
 import { ChannelService } from '@/channel/channel.service';
 import EventWrapper from '@/channel/lib/EventWrapper';
 import ChannelHandler from '@/channel/lib/Handler';
+import { ChannelName } from '@/channel/types';
 import { SubscriberCreateDto } from '@/chat/dto/subscriber.dto';
+import { WithUrl } from '@/chat/schemas/types/attachment';
 import {
   OutgoingMessageFormat,
   StdEventType,
+  StdOutgoingAttachmentMessage,
   StdOutgoingEnvelope,
   StdOutgoingQuickRepliesMessage,
   StdOutgoingTextMessage,
@@ -29,7 +41,6 @@ import { GraphApi } from './lib/graph-api';
 import { WHATSAPP_CHANNEL_NAME } from './settings';
 import { Whatsapp } from './types';
 import WhatsappEventWrapper from './wrapper';
-import { ChannelName } from '@/channel/types';
 
 @Injectable()
 export default class WhatsappHandler extends ChannelHandler<
@@ -127,6 +138,7 @@ export default class WhatsappHandler extends ChannelHandler<
         err: 'Whatsapp Channel Handler : Webhook received no entry data.',
       });
     }
+    //TODO: delete before push
     this.logger.debug('DATA ENTRY:', data.entry);
     data.entry.forEach((entry: any) => {
       // Iterate over each messaging event (in parallel)
@@ -154,12 +166,68 @@ export default class WhatsappHandler extends ChannelHandler<
     return res.status(200).json({ success: true });
   }
 
+  _formatMessage(
+    envelope: StdOutgoingEnvelope,
+    recipient_id: string,
+    options: BlockOptions,
+  ): Whatsapp.OutgoingMessageBase {
+    debugger;
+    switch (envelope.format) {
+      // case OutgoingMessageFormat.attachment:
+      //   return this._attachmentFormat(envelope.message,recipient_id, options);
+      // case OutgoingMessageFormat.buttons:
+      //   return this._buttonsFormat(envelope.message,recipient_id, options);
+      // case OutgoingMessageFormat.carousel:
+      //   return this._carouselFormat(envelope.message,recipient_id, options);
+      // case OutgoingMessageFormat.list:
+      //   return this._listFormat(envelope.message,recipient_id, options);
+      case OutgoingMessageFormat.quickReplies:
+        return this._quickRepliesFormat(
+          envelope.message,
+          recipient_id,
+          options,
+        ) as any as Whatsapp.OutgoingMessageBase;
+      //TODO: fix typage;
+      case OutgoingMessageFormat.text:
+        return this._textFormat(
+          envelope.message,
+          recipient_id,
+          options,
+        ) as any as Whatsapp.OutgoingMessageBase;
+      //TODO: fix typage;
+      case OutgoingMessageFormat.attachment:
+        return this._attachmentFormat(
+          envelope.message,
+          recipient_id,
+          options,
+        ) as any as Whatsapp.OutgoingMessageBase;
+
+      default:
+        throw new Error('Unknown message format');
+    }
+  }
+
   _buttonsFormat() {
     throw new Error('Method not implemented.2');
   }
 
-  _attachmentFormat() {
-    throw new Error('Method not implemented.3');
+  _attachmentFormat(
+    message: StdOutgoingAttachmentMessage<WithUrl<Attachment>>,
+    recipient_id: string,
+    _options?: any,
+  ) {
+    debugger;
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient_id,
+      type: 'image',
+      image: {
+        id: message.attachment.payload.id,
+        link: message.attachment.payload.url,
+        // caption: '<IMAGE_CAPTION_TEXT>',
+      },
+    };
   }
 
   _formatElements(): any[] {
@@ -218,40 +286,6 @@ export default class WhatsappHandler extends ChannelHandler<
     };
   }
 
-  _formatMessage(
-    envelope: StdOutgoingEnvelope,
-    recipient_id: string,
-    options: BlockOptions,
-  ): Whatsapp.OutgoingMessageBase {
-    switch (envelope.format) {
-      // case OutgoingMessageFormat.attachment:
-      //   return this._attachmentFormat(envelope.message,recipient_id, options);
-      // case OutgoingMessageFormat.buttons:
-      //   return this._buttonsFormat(envelope.message,recipient_id, options);
-      // case OutgoingMessageFormat.carousel:
-      //   return this._carouselFormat(envelope.message,recipient_id, options);
-      // case OutgoingMessageFormat.list:
-      //   return this._listFormat(envelope.message,recipient_id, options);
-      case OutgoingMessageFormat.quickReplies:
-        return this._quickRepliesFormat(
-          envelope.message,
-          recipient_id,
-          options,
-        ) as any as Whatsapp.OutgoingMessageBase;
-      //TODO: fix typage;
-      case OutgoingMessageFormat.text:
-        return this._textFormat(
-          envelope.message,
-          recipient_id,
-          options,
-        ) as any as Whatsapp.OutgoingMessageBase;
-      //TODO: fix typage;
-
-      default:
-        throw new Error('Unknown message format');
-    }
-  }
-
   async sendMessage(
     event: EventWrapper<any, any>,
     envelope: StdOutgoingEnvelope,
@@ -278,7 +312,7 @@ export default class WhatsappHandler extends ChannelHandler<
       last_name: 'test',
       gender: 'test',
       channel: {
-        name: this.getName() as ChannelName
+        name: this.getName() as ChannelName,
       },
       assignedAt: null,
       assignedTo: null,
