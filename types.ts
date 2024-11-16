@@ -101,6 +101,7 @@ export namespace Whatsapp {
     from: string; //The customer's WhatsApp ID.
     id: string; //The ID for the message that was received by the business.
     // identity: {};
+    location: locationType;
     timestamp: string;
     text: Text;
     type: messageType;
@@ -113,6 +114,11 @@ export namespace Whatsapp {
     interactive: Interactive;
     errors: Error[];
   }
+
+  export type locationType = {
+    latitude: number;
+    longitude: number;
+  };
 
   export type Statuses = {
     biz_opaque_callback_data: string;
@@ -212,6 +218,7 @@ export namespace Whatsapp {
     sticker = 'sticker',
     unknown = 'unknown',
     video = 'video',
+    location = 'location',
   }
 
   export enum messageStatus {

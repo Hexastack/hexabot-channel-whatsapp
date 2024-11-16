@@ -13,6 +13,7 @@ import {
 } from '@/chat/schemas/types/attachment';
 import {
   IncomingMessageType,
+  PayloadType,
   StdEventType,
   StdIncomingMessage,
 } from '@/chat/schemas/types/message';
@@ -36,6 +37,13 @@ type WhatsappEventAdapter =
       eventType: StdEventType.message;
       messageType: IncomingMessageType.postback;
       raw: Whatsapp.IncomingPostback;
+    }
+  | {
+      eventType: StdEventType.message | StdEventType.echo;
+      messageType:
+        | IncomingMessageType.location
+        | IncomingMessageType.attachments;
+      raw: Whatsapp.IncomingMessage;
     };
 
 export default class WhatsappEventWrapper extends EventWrapper<
@@ -45,9 +53,12 @@ export default class WhatsappEventWrapper extends EventWrapper<
   _init(event: Whatsapp.Event) {
     debugger;
     if (event.value.messages) {
+      this._adapter.eventType = StdEventType.message;
       if (event.value.messages[0].type === Whatsapp.messageType.text) {
-        this._adapter.eventType = StdEventType.message;
         this._adapter.messageType = IncomingMessageType.message;
+      }
+      if (event.value.messages[0].type === Whatsapp.messageType.location) {
+        this._adapter.messageType = IncomingMessageType.location;
       }
     }
     if (
@@ -74,6 +85,16 @@ export default class WhatsappEventWrapper extends EventWrapper<
         case IncomingMessageType.postback:
           return this._adapter.raw.value.messages[0].interactive.button_reply
             .id;
+        case IncomingMessageType.location: {
+          const coordinates = this._adapter.raw.value.messages[0].location;
+          return {
+            type: PayloadType.location,
+            coordinates: {
+              lat: coordinates?.latitude || 0,
+              lon: coordinates?.longitude || 0,
+            },
+          };
+        }
       }
     }
     return undefined;
@@ -100,6 +121,16 @@ export default class WhatsappEventWrapper extends EventWrapper<
           text: this._adapter.raw.value.messages[0].interactive.button_reply
             .title,
         };
+      case IncomingMessageType.location: {
+        const coordinates = this._adapter.raw.value.messages[0].location;
+        return {
+          type: PayloadType.location,
+          coordinates: {
+            lat: coordinates?.latitude || 0,
+            lon: coordinates?.longitude || 0,
+          },
+        };
+      }
       default:
         throw new Error('Unknown incoming message type');
     }
