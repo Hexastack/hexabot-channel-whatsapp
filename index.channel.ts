@@ -138,8 +138,6 @@ export default class WhatsappHandler extends ChannelHandler<
         err: 'Whatsapp Channel Handler : Webhook received no entry data.',
       });
     }
-    //TODO: delete before push
-    this.logger.debug('DATA ENTRY:', data.entry);
     data.entry.forEach((entry: any) => {
       // Iterate over each messaging event (in parallel)
       entry.changes.forEach((e: Whatsapp.Event) => {

@@ -80,6 +80,7 @@ export namespace Whatsapp {
       metadata: Metadata;
       contacts: UserData[];
       messages: IncomingMessageBase[];
+      statuses: Statuses[];
     };
     field: string;
   };

@@ -24,7 +24,7 @@ import { Whatsapp } from './types';
 
 type WhatsappEventAdapter =
   | {
-      eventType: StdEventType.message;
+      eventType: StdEventType.message | StdEventType.echo;
       messageType: IncomingMessageType.message;
       raw: Whatsapp.IncomingMessage;
     }
@@ -51,7 +51,6 @@ export default class WhatsappEventWrapper extends EventWrapper<
   Whatsapp.Event
 > {
   _init(event: Whatsapp.Event) {
-    debugger;
     if (event.value.messages) {
       this._adapter.eventType = StdEventType.message;
       if (event.value.messages[0].type === Whatsapp.messageType.text) {
@@ -60,20 +59,22 @@ export default class WhatsappEventWrapper extends EventWrapper<
       if (event.value.messages[0].type === Whatsapp.messageType.location) {
         this._adapter.messageType = IncomingMessageType.location;
       }
+      if (
+        event.value.messages[0].hasOwnProperty('interactive') &&
+        event.value.messages[0].interactive.hasOwnProperty('button_reply')
+      ) {
+        this._adapter.messageType = IncomingMessageType.postback;
+      }
     }
-    if (
-      event.value.messages[0].hasOwnProperty('interactive') &&
-      event.value.messages[0].interactive.hasOwnProperty('button_reply')
-    ) {
-      this._adapter.eventType = StdEventType.message;
-      this._adapter.messageType = IncomingMessageType.postback;
+    if (event.value.statuses) {
+      //echo message
+      this._adapter.eventType = StdEventType.echo;
     }
     this._adapter.raw = event;
   }
 
   getId(): string {
     if (this._adapter.raw.value.messages[0].id) {
-      // console.log('The message id is:', this._adapter.raw.value.messages[0].id);
       return this._adapter.raw.value.messages[0].id;
     }
     throw new Error('The message id is missing');
@@ -101,14 +102,9 @@ export default class WhatsappEventWrapper extends EventWrapper<
   }
 
   getMessage(): StdIncomingMessage {
-    if (
-      [StdEventType.message, StdEventType.echo].indexOf(
-        this._adapter.eventType,
-      ) === -1
-    ) {
+    if (this._adapter.eventType === StdEventType.echo) {
       throw new Error('Called getMessage() on a non-message event');
     }
-
     switch (this._adapter.messageType) {
       case IncomingMessageType.message:
         return {
@@ -159,7 +155,8 @@ export default class WhatsappEventWrapper extends EventWrapper<
   }
 
   getRecipientForeignId(): string {
-    return this._adapter.raw.value.metadata.phone_number_id;
+    if (this.getEventType() === StdEventType.echo) return null;
+    return null;
   }
 
   getEventType(): StdEventType {
