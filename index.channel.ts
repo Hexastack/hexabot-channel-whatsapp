@@ -24,6 +24,7 @@ import {
   StdEventType,
   StdOutgoingAttachmentMessage,
   StdOutgoingEnvelope,
+  StdOutgoingListMessage,
   StdOutgoingQuickRepliesMessage,
   StdOutgoingTextMessage,
 } from '@/chat/schemas/types/message';
@@ -176,8 +177,13 @@ export default class WhatsappHandler extends ChannelHandler<
       //   return this._buttonsFormat(envelope.message,recipient_id, options);
       // case OutgoingMessageFormat.carousel:
       //   return this._carouselFormat(envelope.message,recipient_id, options);
-      // case OutgoingMessageFormat.list:
-      //   return this._listFormat(envelope.message,recipient_id, options);
+      //TODO: fix typage;
+      case OutgoingMessageFormat.list:
+        return this._listFormat(
+          envelope.message,
+          recipient_id,
+          options,
+        ) as any as Whatsapp.OutgoingMessageBase;
       case OutgoingMessageFormat.quickReplies:
         return this._quickRepliesFormat(
           envelope.message,
@@ -220,7 +226,11 @@ export default class WhatsappHandler extends ChannelHandler<
       type: 'image',
       image: {
         // id image should be send by url only https://stackoverflow.com/questions/71296626/what-are-these-media-providers-in-whatsapp-apis
-        link: message.attachment.payload.url,
+        //TODO: correct this
+        link: message.attachment.payload.url.replace(
+          'localhost:4000',
+          '', //ngrok link
+        ),
         caption: message.attachment.payload.name,
       },
     };
@@ -231,8 +241,37 @@ export default class WhatsappHandler extends ChannelHandler<
     throw new Error('Method not implemented.4');
   }
 
-  _listFormat() {
-    throw new Error('Method not implemented.5');
+  _listFormat(
+    message: StdOutgoingListMessage,
+    recipient_id: string,
+    _options?: any,
+  ) {
+    debugger;
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient_id,
+      type: 'interactive',
+      interactive: {
+        type: 'list',
+        body: {
+          text: message.options.fields.title,
+        },
+        action: {
+          sections: [
+            {
+              title: 'Title',
+              rows: message.elements.map((row: any) => ({
+                id: row.id,
+                title: row.title,
+                // description: row.description, // Optional: Include if available
+              })),
+            },
+          ],
+          button: message.options.buttons[0].title,
+        },
+      },
+    };
   }
 
   _carouselFormat() {
