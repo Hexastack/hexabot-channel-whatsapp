@@ -8,7 +8,7 @@
 
 import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Request, Response } from 'express';
 
 import { Attachment } from '@/attachment/schemas/attachment.schema';
@@ -35,6 +35,7 @@ import { MenuService } from '@/cms/services/menu.service';
 import { I18nService } from '@/i18n/services/i18n.service';
 import { LanguageService } from '@/i18n/services/language.service';
 import { LoggerService } from '@/logger/logger.service';
+import { Setting } from '@/setting/schemas/setting.schema';
 import { SettingService } from '@/setting/services/setting.service';
 
 import { GraphApi } from './lib/graph-api';
@@ -171,8 +172,6 @@ export default class WhatsappHandler extends ChannelHandler<
   ): Whatsapp.OutgoingMessageBase {
     debugger;
     switch (envelope.format) {
-      // case OutgoingMessageFormat.attachment:
-      //   return this._attachmentFormat(envelope.message,recipient_id, options);
       // case OutgoingMessageFormat.buttons:
       //   return this._buttonsFormat(envelope.message,recipient_id, options);
       // case OutgoingMessageFormat.carousel:
@@ -214,18 +213,18 @@ export default class WhatsappHandler extends ChannelHandler<
     recipient_id: string,
     _options?: any,
   ) {
-    debugger;
-    return {
+    const payload = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to: recipient_id,
       type: 'image',
       image: {
-        id: message.attachment.payload.id,
+        // id image should be send by url only https://stackoverflow.com/questions/71296626/what-are-these-media-providers-in-whatsapp-apis
         link: message.attachment.payload.url,
-        // caption: '<IMAGE_CAPTION_TEXT>',
+        caption: message.attachment.payload.name,
       },
     };
+    return payload;
   }
 
   _formatElements(): any[] {
@@ -322,6 +321,11 @@ export default class WhatsappHandler extends ChannelHandler<
       lastvisit: new Date(),
       retainedFrom: new Date(),
     };
+  }
+
+  @OnEvent('hook:whatsapp_channel:access_token')
+  async onAccessTokenUpdate(setting: Setting): Promise<void> {
+    this.api = new GraphApi(this.httpService, setting.value);
   }
 
   //TODO onevent update setting (hook:setting:postUpdate)

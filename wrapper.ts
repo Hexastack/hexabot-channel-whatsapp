@@ -50,6 +50,16 @@ export default class WhatsappEventWrapper extends EventWrapper<
   WhatsappEventAdapter,
   Whatsapp.Event
 > {
+  /**
+   * Constructor : channel's event wrapper
+   *
+   * @param handler - The channel's handler
+   * @param event - The message event received
+   */
+  constructor(handler: WhatsappHandler, event: Whatsapp.Event) {
+    super(handler, event);
+  }
+
   _init(event: Whatsapp.Event) {
     if (event.value.messages) {
       this._adapter.eventType = StdEventType.message;
@@ -127,6 +137,7 @@ export default class WhatsappEventWrapper extends EventWrapper<
           },
         };
       }
+      //case IncomingMessageType.attachement
       default:
         throw new Error('Unknown incoming message type');
     }
@@ -134,16 +145,6 @@ export default class WhatsappEventWrapper extends EventWrapper<
 
   getAttachments(): AttachmentPayload<AttachmentForeignKey>[] {
     return [];
-  }
-
-  /**
-   * Constructor : channel's event wrapper
-   *
-   * @param handler - The channel's handler
-   * @param event - The message event received
-   */
-  constructor(handler: WhatsappHandler, event: Whatsapp.Event) {
-    super(handler, event);
   }
 
   getChannelData(): any {
