@@ -18,7 +18,7 @@ import EventWrapper from '@/channel/lib/EventWrapper';
 import ChannelHandler from '@/channel/lib/Handler';
 import { ChannelName } from '@/channel/types';
 import { SubscriberCreateDto } from '@/chat/dto/subscriber.dto';
-import { WithUrl } from '@/chat/schemas/types/attachment';
+import { FileType, WithUrl } from '@/chat/schemas/types/attachment';
 import {
   OutgoingMessageFormat,
   StdEventType,
@@ -171,7 +171,6 @@ export default class WhatsappHandler extends ChannelHandler<
     recipient_id: string,
     options: BlockOptions,
   ): Whatsapp.OutgoingMessageBase {
-    debugger;
     switch (envelope.format) {
       // case OutgoingMessageFormat.buttons:
       //   return this._buttonsFormat(envelope.message,recipient_id, options);
@@ -214,27 +213,64 @@ export default class WhatsappHandler extends ChannelHandler<
     throw new Error('Method not implemented.2');
   }
 
+  castAttachmentType(type: FileType): Whatsapp.AttachmentType {
+    if (type === FileType.file) {
+      return Whatsapp.AttachmentType.document;
+    } else {
+      return type as unknown as Whatsapp.AttachmentType;
+    }
+  }
+
   _attachmentFormat(
     message: StdOutgoingAttachmentMessage<WithUrl<Attachment>>,
     recipient_id: string,
     _options?: any,
-  ) {
-    const payload = {
+  ): Whatsapp.AttachmentTemplate {
+    const { ...restAttachment } = message.attachment;
+    const type = this.castAttachmentType(message.attachment.type);
+    const outgoingMessage: Whatsapp.AttachmentTemplate = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to: recipient_id,
-      type: 'image',
-      image: {
-        // id image should be send by url only https://stackoverflow.com/questions/71296626/what-are-these-media-providers-in-whatsapp-apis
-        //TODO: correct this
-        link: message.attachment.payload.url.replace(
-          'localhost:4000',
-          '', //ngrok link
-        ),
-        caption: message.attachment.payload.name,
-      },
+      // @ts-expect-error to check
+      type,
+      ...restAttachment,
     };
-    return payload;
+    const link = message.attachment.payload.url.replace(
+      'localhost:4000',
+      '', //ngrok link
+    );
+    switch (type) {
+      case Whatsapp.AttachmentType.image:
+        outgoingMessage.image = {
+          link,
+          caption: message.attachment.payload.name || '',
+        };
+        break;
+      case Whatsapp.AttachmentType.document:
+        outgoingMessage.type = type;
+        outgoingMessage.document = {
+          link,
+          caption: message.attachment.payload.name || '',
+          filename: message.attachment.payload.name || '',
+        };
+        break;
+      case Whatsapp.AttachmentType.video:
+        outgoingMessage.video = {
+          link,
+          caption: message.attachment.payload.name || '',
+        };
+        break;
+      case Whatsapp.AttachmentType.audio:
+        outgoingMessage.audio = {
+          id: message.attachment.payload.id,
+        };
+        break;
+      default:
+        throw new Error(`Unsupported attachment type: ${type}`);
+    }
+
+    return outgoingMessage;
   }
 
   _formatElements(): any[] {
@@ -246,7 +282,6 @@ export default class WhatsappHandler extends ChannelHandler<
     recipient_id: string,
     _options?: any,
   ) {
-    debugger;
     return {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -264,7 +299,7 @@ export default class WhatsappHandler extends ChannelHandler<
               rows: message.elements.map((row: any) => ({
                 id: row.id,
                 title: row.title,
-                // description: row.description, // Optional: Include if available
+                description: row.description, // Optional: Include if available
               })),
             },
           ],

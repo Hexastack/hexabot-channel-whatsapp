@@ -164,25 +164,6 @@ export namespace Whatsapp {
     title: string;
   };
 
-  export interface Image {
-    caption: string;
-    sha256: string;
-    id: string; //ID for the image.
-    mime_type: string;
-  }
-
-  export type Video = {
-    caption: string;
-    sha256: string; //The hash for the video.
-    mime_type: string;
-    id: string; //ID for the document.
-  };
-
-  export type Audio = {
-    id: string;
-    mime_type: string;
-  };
-
   export type Button = {
     payload: string;
     text: string;
@@ -197,14 +178,6 @@ export namespace Whatsapp {
       catalog_id: string;
       product_retailer_id: string;
     };
-  }
-
-  export interface Document {
-    caption: string;
-    filename: string;
-    sha256: string;
-    mime_type: string;
-    id: string; //ID for the document.
   }
 
   export enum messageType {
@@ -235,10 +208,6 @@ export namespace Whatsapp {
 
   export type Event = IncomingMessage;
 
-  export interface OutgoingMessageBase {
-    text?: string;
-  }
-
   export type Recipient = {
     id: string; //whatsapp phone number
   };
@@ -247,4 +216,45 @@ export namespace Whatsapp {
     | OutgoingMessage
     | string
     | { messages: OutgoingMessageBase[] };
+
+  export enum AttachmentType {
+    document = 'document',
+    image = 'image',
+    video = 'video',
+    audio = 'audio',
+  }
+
+  export interface AttachmentTemplate {
+    messaging_product: 'whatsapp';
+    recipient_type: 'individual';
+    to: string;
+    type: AttachmentType;
+    image?: Image;
+    document?: Document;
+    video?: Video;
+    audio?: Audio;
+  }
+
+  export interface Document {
+    id?: string;
+    link?: string;
+    caption?: string;
+    filename?: string;
+  }
+
+  export interface Image {
+    id?: string;
+    link?: string;
+    caption?: string;
+  }
+
+  export interface Video {
+    id?: string;
+    link?: string;
+    caption?: string;
+  }
+
+  export interface Audio {
+    id: string;
+  }
 }
