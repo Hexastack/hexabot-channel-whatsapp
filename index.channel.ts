@@ -178,32 +178,17 @@ export default class WhatsappHandler extends ChannelHandler<
       //   return this._carouselFormat(envelope.message,recipient_id, options);
       //TODO: fix typage;
       case OutgoingMessageFormat.list:
-        return this._listFormat(
-          envelope.message,
-          recipient_id,
-          options,
-        ) as any as Whatsapp.OutgoingMessageBase;
+        return this._listFormat(envelope.message, recipient_id, options);
       case OutgoingMessageFormat.quickReplies:
         return this._quickRepliesFormat(
           envelope.message,
           recipient_id,
           options,
-        ) as any as Whatsapp.OutgoingMessageBase;
-      //TODO: fix typage;
+        );
       case OutgoingMessageFormat.text:
-        return this._textFormat(
-          envelope.message,
-          recipient_id,
-          options,
-        ) as any as Whatsapp.OutgoingMessageBase;
-      //TODO: fix typage;
+        return this._textFormat(envelope.message, recipient_id, options);
       case OutgoingMessageFormat.attachment:
-        return this._attachmentFormat(
-          envelope.message,
-          recipient_id,
-          options,
-        ) as any as Whatsapp.OutgoingMessageBase;
-
+        return this._attachmentFormat(envelope.message, recipient_id, options);
       default:
         throw new Error('Unknown message format');
     }
@@ -281,7 +266,7 @@ export default class WhatsappHandler extends ChannelHandler<
     message: StdOutgoingListMessage,
     recipient_id: string,
     _options?: any,
-  ) {
+  ): Whatsapp.OutgoingMessageBase {
     return {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -317,7 +302,7 @@ export default class WhatsappHandler extends ChannelHandler<
     message: StdOutgoingTextMessage,
     recipient_id: string,
     _options?: any,
-  ) {
+  ): Whatsapp.OutgoingMessageBase {
     return {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -333,7 +318,7 @@ export default class WhatsappHandler extends ChannelHandler<
     message: StdOutgoingQuickRepliesMessage,
     recipient_id: string,
     _options?: any,
-  ) {
+  ): Whatsapp.OutgoingMessageBase {
     return {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',

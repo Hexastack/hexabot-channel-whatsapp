@@ -6,8 +6,6 @@
  * 2. All derivative works must include clear attribution to the original creator and software, Hexastack and Hexabot, in a prominent location (e.g., in the software's "About" section, documentation, and README file).
  */
 
-import { StdQuickReply } from '@/chat/schemas/types/quick-reply';
-
 export namespace Whatsapp {
   export enum SettingLabel {
     app_secret = 'app_secret',
@@ -98,6 +96,38 @@ export namespace Whatsapp {
     user_id?: string; //Additional unique, alphanumeric identifier for a WhatsApp user.
   }
 
+  export interface Context {
+    forwarded: boolean;
+    frequently_forwarded: boolean;
+    from: string; //The WhatsApp ID for the customer who replied to an inbound message.
+    id: string; //The message ID for the sent message for an inbound reply.
+    referred_product: {
+      catalog_id: string;
+      product_retailer_id: string;
+    };
+  }
+
+  export enum messageType {
+    audio = 'audio',
+    button = 'button',
+    document = 'document',
+    text = 'text',
+    image = 'image',
+    interactive = 'interactive',
+    order = 'order',
+    system = 'system',
+    sticker = 'sticker',
+    unknown = 'unknown',
+    video = 'video',
+    location = 'location',
+  }
+
+  export enum messageStatus {
+    delivered = 'delivered',
+    read = 'read',
+    sent = 'sent',
+  }
+
   export interface IncomingMessageBase {
     from: string; //The customer's WhatsApp ID.
     id: string; //The ID for the message that was received by the business.
@@ -154,10 +184,43 @@ export namespace Whatsapp {
     body: string;
   };
 
+  export type Body = {
+    text: string;
+  };
+
   export type Interactive = {
     type: string;
-    button_reply: InteractiveButtonReply;
-    list_reply: InteractiveListReply;
+    body?: Body;
+    action: Action;
+    button_reply?: InteractiveButtonReply;
+    list_reply?: InteractiveListReply;
+  };
+
+  export type Action = {
+    buttons?: actionButton[];
+    sections?: section[];
+    button?: string;
+  };
+
+  export type section = {
+    title: string;
+    rows: row[];
+  };
+
+  export type row = {
+    id: string;
+    title: string;
+    description: string;
+  };
+
+  export type actionButton = {
+    type: string;
+    reply: replyButton;
+  };
+
+  export type replyButton = {
+    id: string;
+    title: string;
   };
 
   export type InteractiveButtonReply = {
@@ -175,41 +238,13 @@ export namespace Whatsapp {
     text: string;
   };
 
-  export interface Context {
-    forwarded: boolean;
-    frequently_forwarded: boolean;
-    from: string; //The WhatsApp ID for the customer who replied to an inbound message.
-    id: string; //The message ID for the sent message for an inbound reply.
-    referred_product: {
-      catalog_id: string;
-      product_retailer_id: string;
-    };
-  }
-
-  export enum messageType {
-    audio = 'audio',
-    button = 'button',
-    document = 'document',
-    text = 'text',
-    image = 'image',
-    interactive = 'interactive',
-    order = 'order',
-    system = 'system',
-    sticker = 'sticker',
-    unknown = 'unknown',
-    video = 'video',
-    location = 'location',
-  }
-
-  export enum messageStatus {
-    delivered = 'delivered',
-    read = 'read',
-    sent = 'sent',
-  }
-
   export interface OutgoingMessageBase {
-    text?: string;
-    quick_replies?: StdQuickReply[];
+    messaging_product: string;
+    recipient_type: string;
+    to: string;
+    type: string;
+    text?: Text;
+    interactive?: Interactive;
   }
 
   export type Event = IncomingMessage;
@@ -231,8 +266,8 @@ export namespace Whatsapp {
   }
 
   export interface AttachmentTemplate {
-    messaging_product: 'whatsapp';
-    recipient_type: 'individual';
+    messaging_product: string;
+    recipient_type: string;
     to: string;
     type: AttachmentType;
     image?: Image;
