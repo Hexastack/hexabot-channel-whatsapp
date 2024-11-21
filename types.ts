@@ -157,9 +157,15 @@ export namespace Whatsapp {
   export type Interactive = {
     type: string;
     button_reply: InteractiveButtonReply;
+    list_reply: InteractiveListReply;
   };
 
   export type InteractiveButtonReply = {
+    id: string;
+    title: string;
+  };
+
+  export type InteractiveListReply = {
     id: string;
     title: string;
   };

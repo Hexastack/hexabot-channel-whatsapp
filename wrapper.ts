@@ -71,9 +71,13 @@ export default class WhatsappEventWrapper extends EventWrapper<
       }
       if (
         event.value.messages[0].hasOwnProperty('interactive') &&
-        event.value.messages[0].interactive.hasOwnProperty('button_reply')
+        (event.value.messages[0].interactive.hasOwnProperty('button_reply') ||
+          event.value.messages[0].interactive.hasOwnProperty('list_reply'))
       ) {
         this._adapter.messageType = IncomingMessageType.postback;
+      }
+      if (event.value.messages[0].hasOwnProperty('image')) {
+        this._adapter.messageType = IncomingMessageType.attachments;
       }
     }
     if (event.value.statuses) {
@@ -93,9 +97,19 @@ export default class WhatsappEventWrapper extends EventWrapper<
   getPayload(): Payload | string | undefined {
     if (this._adapter.eventType === StdEventType.message) {
       switch (this._adapter.messageType) {
-        case IncomingMessageType.postback:
-          return this._adapter.raw.value.messages[0].interactive.button_reply
-            .id;
+        case IncomingMessageType.postback: {
+          if (
+            this._adapter.raw.value.messages[0].hasOwnProperty('button_reply')
+          )
+            return this._adapter.raw.value.messages[0].interactive.button_reply
+              .id;
+          else if (
+            this._adapter.raw.value.messages[0].hasOwnProperty('list_reply')
+          )
+            return this._adapter.raw.value.messages[0].interactive.list_reply
+              .id;
+          break;
+        }
         case IncomingMessageType.location: {
           const coordinates = this._adapter.raw.value.messages[0].location;
           return {
@@ -106,6 +120,20 @@ export default class WhatsappEventWrapper extends EventWrapper<
             },
           };
         }
+        // problem here is that whatsapp api doesn't return the media url
+        // case IncomingMessageType.attachments: {
+        //   const attachment: Whatsapp.Attachment =
+        //     this._adapter.raw.message.attachments[0];
+        //   return {
+        //     type: PayloadType.attachments,
+        //     attachments: {
+        //       type: <FileType>(<unknown>attachment.type),
+        //       payload: {
+        //         url: attachment?.payload?.url || '',
+        //       },
+        //     },
+        //   };
+        // }
       }
     }
     return undefined;
@@ -120,13 +148,27 @@ export default class WhatsappEventWrapper extends EventWrapper<
         return {
           text: this._adapter.raw.value.messages[0].text.body,
         };
-      case IncomingMessageType.postback:
-        return {
-          postback:
-            this._adapter.raw.value.messages[0].interactive.button_reply.id,
-          text: this._adapter.raw.value.messages[0].interactive.button_reply
-            .title,
-        };
+      case IncomingMessageType.postback: {
+        if (
+          this._adapter.raw.value.messages[0].interactive.type ===
+          'button_reply'
+        )
+          return {
+            postback:
+              this._adapter.raw.value.messages[0].interactive.button_reply.id,
+            text: this._adapter.raw.value.messages[0].interactive.button_reply
+              .title,
+          };
+        else if (
+          this._adapter.raw.value.messages[0].interactive.type === 'list_reply'
+        )
+          return {
+            postback:
+              this._adapter.raw.value.messages[0].interactive.list_reply.id,
+            text: this._adapter.raw.value.messages[0].interactive.list_reply
+              .title,
+          };
+      }
       case IncomingMessageType.location: {
         const coordinates = this._adapter.raw.value.messages[0].location;
         return {
