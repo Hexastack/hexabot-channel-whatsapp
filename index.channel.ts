@@ -329,10 +329,6 @@ export default class WhatsappHandler extends ChannelHandler<
     return outgoingMessage;
   }
 
-  _formatElements(): any[] {
-    throw new Error('Method not implemented.4');
-  }
-
   _listFormat(
     message: StdOutgoingListMessage,
     recipient_id: string,
