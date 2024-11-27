@@ -6,10 +6,12 @@
  * 2. All derivative works must include clear attribution to the original creator and software, Hexastack and Hexabot, in a prominent location (e.g., in the software's "About" section, documentation, and README file).
  */
 
+import crypto from 'crypto';
+
 import { HttpService } from '@nestjs/axios';
-import { Injectable } from '@nestjs/common';
+import { Injectable, RawBodyRequest } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 
 import { Attachment } from '@/attachment/schemas/attachment.schema';
 import { AttachmentService } from '@/attachment/services/attachment.service';
@@ -80,9 +82,7 @@ export default class WhatsappHandler extends ChannelHandler<
     const settings = await this.getSettings();
     this.api = new GraphApi(
       this.httpService,
-      settings && typeof settings.access_token === 'string'
-        ? settings.access_token
-        : '',
+      settings ? settings.access_token : '',
     );
   }
 
@@ -119,6 +119,73 @@ export default class WhatsappHandler extends ChannelHandler<
     }
   }
 
+  _validateMessage(req: Request, res: Response, next: () => void) {
+    const data: any = req.body;
+
+    if (data.object !== 'whatsapp_business_account') {
+      this.logger.warn(
+        'Whatsapp Channel Handler : Missing `whatsapp_business_account` attribute!',
+        data,
+      );
+      return res
+        .status(400)
+        .json({ err: 'The whatsapp_business_account parameter is missing!' });
+    }
+    return next();
+  }
+
+  async middleware(
+    req: RawBodyRequest<Request>,
+    _res: Response,
+    next: NextFunction,
+  ) {
+    const signature: string = req.headers['x-hub-signature'] as string;
+
+    if (!signature) {
+      return next();
+    }
+
+    const settings = await this.getSettings();
+    const expectedHash = crypto
+      .createHmac('sha1', settings.app_secret)
+      .update(req.rawBody)
+      .digest('hex');
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    req.whatsapp = { expectedHash };
+    next();
+  }
+
+  _verifySignature(req: Request, res: Response, next: () => void) {
+    const signature: string = req.headers['x-hub-signature'] as string;
+    const elements: string[] = signature.split('=');
+    const signatureHash = elements[1];
+
+    const expectedHash =
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      req.whatsapp
+        ? // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          req.whatsapp.expectedHash
+        : '';
+
+    if (signatureHash !== expectedHash) {
+      this.logger.warn(
+        "Messenger Channel Handler : Couldn't match the request signature.",
+        signatureHash,
+        expectedHash,
+      );
+      return res
+        .status(500)
+        .json({ err: "Couldn't match the request signature." });
+    }
+    this.logger.debug(
+      'Messenger Channel Handler : Request signature has been validated.',
+    );
+    return next();
+  }
+
   async handle(req: Request, res: Response) {
     const handler: WhatsappHandler = this;
 
@@ -126,44 +193,48 @@ export default class WhatsappHandler extends ChannelHandler<
     if (req.method === 'GET') {
       return await handler.subscribe(req, res);
     }
-
-    const data = req.body;
-    this.logger.debug(
-      'Whatsapp Channel Handler : Webhook notification received.',
-    );
-    // Check notification
-    if (!('entry' in data)) {
-      this.logger.error(
-        'Whatsapp Channel Handler : Webhook received no entry data.',
-      );
-      return res.status(500).json({
-        err: 'Whatsapp Channel Handler : Webhook received no entry data.',
-      });
-    }
-    data.entry.forEach((entry: any) => {
-      // Iterate over each messaging event (in parallel)
-      entry.changes.forEach((e: Whatsapp.Event) => {
-        try {
-          const event = new WhatsappEventWrapper(handler, e);
-          const type: StdEventType = event.getEventType();
-          if (type) {
-            this.eventEmitter.emit(`hook:chatbot:${type}`, event);
-          } else {
-            this.logger.error(
-              'Whatsapp Channel Handler : Webhook received unknown event ',
-              event,
-            );
-          }
-        } catch (err) {
-          // if any of the events produced an error, err would equal that error
+    return handler._verifySignature(req, res, () => {
+      return handler._validateMessage(req, res, () => {
+        const data = req.body;
+        this.logger.debug(
+          'Whatsapp Channel Handler : Webhook notification received.',
+        );
+        // Check notification
+        if (!('entry' in data)) {
           this.logger.error(
-            'Whatsapp Channel Handler : Something went wrong while handling events',
-            err,
+            'Whatsapp Channel Handler : Webhook received no entry data.',
           );
+          return res.status(500).json({
+            err: 'Whatsapp Channel Handler : Webhook received no entry data.',
+          });
         }
+
+        data.entry.forEach((entry: any) => {
+          // Iterate over each messaging event (in parallel)
+          entry.changes.forEach((e: Whatsapp.Event) => {
+            try {
+              const event = new WhatsappEventWrapper(handler, e);
+              const type: StdEventType = event.getEventType();
+              if (type) {
+                this.eventEmitter.emit(`hook:chatbot:${type}`, event);
+              } else {
+                this.logger.error(
+                  'Whatsapp Channel Handler : Webhook received unknown event ',
+                  event,
+                );
+              }
+            } catch (err) {
+              // if any of the events produced an error, err would equal that error
+              this.logger.error(
+                'Whatsapp Channel Handler : Something went wrong while handling events',
+                err,
+              );
+            }
+          });
+        });
+        return res.status(200).json({ success: true });
       });
     });
-    return res.status(200).json({ success: true });
   }
 
   _formatMessage(
