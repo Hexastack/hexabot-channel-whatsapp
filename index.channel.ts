@@ -25,6 +25,7 @@ import {
   OutgoingMessageFormat,
   StdEventType,
   StdOutgoingAttachmentMessage,
+  StdOutgoingButtonsMessage,
   StdOutgoingEnvelope,
   StdOutgoingListMessage,
   StdOutgoingQuickRepliesMessage,
@@ -243,11 +244,10 @@ export default class WhatsappHandler extends ChannelHandler<
     options: BlockOptions,
   ): Whatsapp.OutgoingMessageBase {
     switch (envelope.format) {
-      // case OutgoingMessageFormat.buttons:
-      //   return this._buttonsFormat(envelope.message,recipient_id, options);
       // case OutgoingMessageFormat.carousel:
       //   return this._carouselFormat(envelope.message,recipient_id, options);
-      //TODO: fix typage;
+      case OutgoingMessageFormat.buttons:
+        return this._buttonsFormat(envelope.message, recipient_id, options);
       case OutgoingMessageFormat.list:
         return this._listFormat(envelope.message, recipient_id, options);
       case OutgoingMessageFormat.quickReplies:
@@ -265,8 +265,91 @@ export default class WhatsappHandler extends ChannelHandler<
     }
   }
 
-  _buttonsFormat() {
-    throw new Error('Method not implemented.2');
+  _buttonsFormat(
+    message: StdOutgoingButtonsMessage,
+    recipient_id: string,
+    _options?: any,
+  ): Whatsapp.OutgoingMessageBase {
+    return {
+      //TODO fix the url button
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient_id,
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: {
+          text: message.text,
+        },
+        action: {
+          buttons: message.buttons.map((quickReply: any) => ({
+            type: 'reply',
+            reply: {
+              id: quickReply.payload,
+              title: quickReply.title,
+            },
+          })),
+        },
+      },
+      // messaging_product: 'whatsapp',
+      // recipient_type: 'individual',
+      // to: recipient_id,
+      // type: 'template',
+      // template: {
+      //   name: 'button_template',
+      //   language: {
+      //     code: 'en',
+      //   },
+      //   components: [
+      // {
+      //   type: 'header',
+      //   parameters: [
+      //     {
+      //       type: 'image',
+      //       image: {
+      //         link: 'https://img-cdn.pixlr.com/image-generator/history/65bb506dcb310754719cf81f/ede935de-1138-4f66-8ed7-44bd16efc709/medium.webp',
+      //       },
+      //     },
+      //   ],
+      // },
+      // {
+      //   type: 'body',
+      //   parameters: [
+      //     {
+      //       type: 'text',
+      //       text: message.text,
+      //     },
+      //   ],
+      // },
+      // {
+      //   type: 'button',
+      //   sub_type: 'url',
+      //   index: '0',
+      //   parameters: [
+      //     {
+      //       type: 'payload',
+      //       payload: 'PAYLOAD',
+      //     },
+      //   ],
+      // },
+      //   ],
+      // },
+      // interactive: {
+      //   type: 'button',
+      //   body: {
+      //     text: message.text,
+      //   },
+      //   action: {
+      //     buttons: message.buttons.map((buttons: any) => ({
+      //       type: 'reply',
+      //       reply: {
+      //         id: buttons.payload || buttons.url,
+      //         title: buttons.title,
+      //       },
+      //     })),
+      //   },
+      // },
+    };
   }
 
   castAttachmentType(type: FileType): Whatsapp.AttachmentType {
