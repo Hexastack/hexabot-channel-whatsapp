@@ -34,6 +34,23 @@ export namespace Whatsapp {
     changes: Change[];
   }
 
+  export type WhatsappBusinessAccountData = {
+    id: string;
+    verified_name: string;
+    timezone_id: number;
+  };
+
+  export type WhatsappBusinessProfileData = {
+    about: string;
+    address: string;
+    description: string;
+    email: string;
+    messaging_profile: string;
+    profile_picture_url: string;
+    websites: string[];
+    vertical: string;
+  };
+
   export interface Change {
     value: IncomingMessage;
     field: string; //Notification type. Value will be messages.
@@ -50,6 +67,7 @@ export namespace Whatsapp {
     };
   }
 
+  //to fix
   export interface OutgoingMessage {
     messaging_product: 'whatsapp';
     to: string;

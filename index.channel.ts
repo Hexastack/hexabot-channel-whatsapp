@@ -16,7 +16,6 @@ import { NextFunction, Request, Response } from 'express';
 import { Attachment } from '@/attachment/schemas/attachment.schema';
 import { AttachmentService } from '@/attachment/services/attachment.service';
 import { ChannelService } from '@/channel/channel.service';
-import EventWrapper from '@/channel/lib/EventWrapper';
 import ChannelHandler from '@/channel/lib/Handler';
 import { ChannelName } from '@/channel/types';
 import { SubscriberCreateDto } from '@/chat/dto/subscriber.dto';
@@ -211,7 +210,6 @@ export default class WhatsappHandler extends ChannelHandler<
         }
 
         data.entry.forEach((entry: any) => {
-          // Iterate over each messaging event (in parallel)
           entry.changes.forEach((e: Whatsapp.Event) => {
             try {
               const event = new WhatsappEventWrapper(handler, e);
@@ -225,7 +223,6 @@ export default class WhatsappHandler extends ChannelHandler<
                 );
               }
             } catch (err) {
-              // if any of the events produced an error, err would equal that error
               this.logger.error(
                 'Whatsapp Channel Handler : Something went wrong while handling events',
                 err,
@@ -265,10 +262,150 @@ export default class WhatsappHandler extends ChannelHandler<
     }
   }
 
+  castAttachmentType(type: FileType): Whatsapp.AttachmentType {
+    if (type === FileType.file) {
+      return Whatsapp.AttachmentType.document;
+    } else {
+      return type as unknown as Whatsapp.AttachmentType;
+    }
+  }
+
+  _attachmentFormat(
+    message: StdOutgoingAttachmentMessage<WithUrl<Attachment>>,
+    recipient_id: string,
+    _options?: BlockOptions,
+  ): Whatsapp.AttachmentTemplate {
+    const { ...restAttachment } = message.attachment;
+    const type = this.castAttachmentType(message.attachment.type);
+    const outgoingMessage: Whatsapp.AttachmentTemplate = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient_id,
+      // @ts-expect-error to check
+      type,
+      ...restAttachment,
+    };
+    const link = message.attachment.payload.url.replace(
+      'localhost:4000',
+      '', //ngrok link
+    );
+    switch (type) {
+      case Whatsapp.AttachmentType.image:
+        outgoingMessage.image = {
+          link,
+          caption: message.attachment.payload.name || '',
+        };
+        break;
+      case Whatsapp.AttachmentType.document:
+        outgoingMessage.type = type;
+        outgoingMessage.document = {
+          link,
+          caption: message.attachment.payload.name || '',
+          filename: message.attachment.payload.name || '',
+        };
+        break;
+      case Whatsapp.AttachmentType.video:
+        outgoingMessage.video = {
+          link,
+          caption: message.attachment.payload.name || '',
+        };
+        break;
+      case Whatsapp.AttachmentType.audio:
+        outgoingMessage.audio = {
+          id: message.attachment.payload.id,
+        };
+        break;
+      default:
+        throw new Error(`Unsupported attachment type: ${type}`);
+    }
+
+    return outgoingMessage;
+  }
+
+  _listFormat(
+    message: StdOutgoingListMessage,
+    recipient_id: string,
+    _options?: BlockOptions,
+  ): Whatsapp.OutgoingMessageBase {
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient_id,
+      type: 'interactive',
+      interactive: {
+        type: 'list',
+        body: {
+          text: message.options.fields.title,
+        },
+        action: {
+          sections: [
+            {
+              title: 'Title',
+              rows: message.elements.map((row: any) => ({
+                id: row.id,
+                title: row.title,
+                description: row.description, // Optional: Include if available
+              })),
+            },
+          ],
+          button: message.options.buttons[0].title,
+        },
+      },
+    };
+  }
+
+  _carouselFormat() {
+    throw new Error('Method not implemented.6');
+  }
+
+  _textFormat(
+    message: StdOutgoingTextMessage,
+    recipient_id: string,
+    _options?: BlockOptions,
+  ): Whatsapp.OutgoingMessageBase {
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient_id,
+      type: 'text',
+      text: {
+        body: message.text,
+      },
+    };
+  }
+
+  _quickRepliesFormat(
+    message: StdOutgoingQuickRepliesMessage,
+    recipient_id: string,
+    _options?: BlockOptions,
+  ): Whatsapp.OutgoingMessageBase {
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient_id,
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: {
+          text: message.text,
+        },
+        action: {
+          buttons: message.quickReplies.map((quickReply: any) => ({
+            type: 'reply',
+            reply: {
+              id: quickReply.payload,
+              title: quickReply.title,
+            },
+          })),
+        },
+      },
+    };
+  }
+
   _buttonsFormat(
     message: StdOutgoingButtonsMessage,
     recipient_id: string,
-    _options?: any,
+    _options?: BlockOptions,
   ): Whatsapp.OutgoingMessageBase {
     return {
       //TODO fix the url button
@@ -352,148 +489,8 @@ export default class WhatsappHandler extends ChannelHandler<
     };
   }
 
-  castAttachmentType(type: FileType): Whatsapp.AttachmentType {
-    if (type === FileType.file) {
-      return Whatsapp.AttachmentType.document;
-    } else {
-      return type as unknown as Whatsapp.AttachmentType;
-    }
-  }
-
-  _attachmentFormat(
-    message: StdOutgoingAttachmentMessage<WithUrl<Attachment>>,
-    recipient_id: string,
-    _options?: any,
-  ): Whatsapp.AttachmentTemplate {
-    const { ...restAttachment } = message.attachment;
-    const type = this.castAttachmentType(message.attachment.type);
-    const outgoingMessage: Whatsapp.AttachmentTemplate = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient_id,
-      // @ts-expect-error to check
-      type,
-      ...restAttachment,
-    };
-    const link = message.attachment.payload.url.replace(
-      'localhost:4000',
-      '', //ngrok link
-    );
-    switch (type) {
-      case Whatsapp.AttachmentType.image:
-        outgoingMessage.image = {
-          link,
-          caption: message.attachment.payload.name || '',
-        };
-        break;
-      case Whatsapp.AttachmentType.document:
-        outgoingMessage.type = type;
-        outgoingMessage.document = {
-          link,
-          caption: message.attachment.payload.name || '',
-          filename: message.attachment.payload.name || '',
-        };
-        break;
-      case Whatsapp.AttachmentType.video:
-        outgoingMessage.video = {
-          link,
-          caption: message.attachment.payload.name || '',
-        };
-        break;
-      case Whatsapp.AttachmentType.audio:
-        outgoingMessage.audio = {
-          id: message.attachment.payload.id,
-        };
-        break;
-      default:
-        throw new Error(`Unsupported attachment type: ${type}`);
-    }
-
-    return outgoingMessage;
-  }
-
-  _listFormat(
-    message: StdOutgoingListMessage,
-    recipient_id: string,
-    _options?: any,
-  ): Whatsapp.OutgoingMessageBase {
-    return {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient_id,
-      type: 'interactive',
-      interactive: {
-        type: 'list',
-        body: {
-          text: message.options.fields.title,
-        },
-        action: {
-          sections: [
-            {
-              title: 'Title',
-              rows: message.elements.map((row: any) => ({
-                id: row.id,
-                title: row.title,
-                description: row.description, // Optional: Include if available
-              })),
-            },
-          ],
-          button: message.options.buttons[0].title,
-        },
-      },
-    };
-  }
-
-  _carouselFormat() {
-    throw new Error('Method not implemented.6');
-  }
-
-  _textFormat(
-    message: StdOutgoingTextMessage,
-    recipient_id: string,
-    _options?: any,
-  ): Whatsapp.OutgoingMessageBase {
-    return {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient_id,
-      type: 'text',
-      text: {
-        body: message.text,
-      },
-    };
-  }
-
-  _quickRepliesFormat(
-    message: StdOutgoingQuickRepliesMessage,
-    recipient_id: string,
-    _options?: any,
-  ): Whatsapp.OutgoingMessageBase {
-    return {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient_id,
-      type: 'interactive',
-      interactive: {
-        type: 'button',
-        body: {
-          text: message.text,
-        },
-        action: {
-          buttons: message.quickReplies.map((quickReply: any) => ({
-            type: 'reply',
-            reply: {
-              id: quickReply.payload,
-              title: quickReply.title,
-            },
-          })),
-        },
-      },
-    };
-  }
-
   async sendMessage(
-    event: EventWrapper<any, any>,
+    event: WhatsappEventWrapper,
     envelope: StdOutgoingEnvelope,
     options: BlockOptions,
     _context?: any,
@@ -505,27 +502,32 @@ export default class WhatsappHandler extends ChannelHandler<
       options,
     );
 
-    const res = await this.api.sendMessage(message);
+    const phoneNumberId = event.getPhoneNumberId();
+    const res = await this.api.sendMessage(message, phoneNumberId);
     return { mid: res.messages[0].id };
   }
 
   async getUserData(event: WhatsappEventWrapper): Promise<SubscriberCreateDto> {
     const defautLanguage = await this.languageService.getDefaultLanguage();
 
+    const userData = await this.api.profileAPI.getUserProfile(
+      event._adapter.raw.value.metadata.phone_number_id,
+    );
+    //TODO: profile picture
     return {
-      foreign_id: event.getSenderForeignId(),
-      first_name: 'test',
-      last_name: 'test',
-      gender: 'test',
+      foreign_id: userData.id,
+      first_name: userData.verified_name,
+      last_name: userData.verified_name,
+      gender: 'unknown',
       channel: {
         name: this.getName() as ChannelName,
       },
       assignedAt: null,
       assignedTo: null,
       labels: [],
-      locale: 'test',
+      locale: null,
       language: defautLanguage.code,
-      timezone: null,
+      timezone: userData.timezone_id,
       country: '',
       lastvisit: new Date(),
       retainedFrom: new Date(),

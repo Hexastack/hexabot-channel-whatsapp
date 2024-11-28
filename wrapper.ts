@@ -217,4 +217,8 @@ export default class WhatsappEventWrapper extends EventWrapper<
   getWatermark() {
     return 0;
   }
+
+  getPhoneNumberId(): string {
+    return this._adapter.raw.value.metadata.phone_number_id;
+  }
 }

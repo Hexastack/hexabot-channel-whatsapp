@@ -22,6 +22,9 @@ import { catchError, map } from 'rxjs/operators';
 
 import { Whatsapp } from '../types';
 
+import { MediaAPI } from './media-api';
+import { ProfileAPI } from './profile-api'; // Import the ProfileAPI class
+
 export interface GraphRequestOptions {
   apiVersion?: string;
   path?: string;
@@ -33,10 +36,17 @@ export interface GraphRequestOptions {
 export class GraphApi {
   private graphApiVersion: string = 'v20.0';
 
+  public profileAPI: ProfileAPI;
+
+  public mediaAPI: MediaAPI;
+
   constructor(
     private readonly httpService: HttpService,
     private readonly pageToken: string,
-  ) {}
+  ) {
+    this.profileAPI = new ProfileAPI(this);
+    this.mediaAPI = new MediaAPI(this);
+  }
 
   public getApiVersion(): string {
     return this.graphApiVersion;
@@ -102,29 +112,12 @@ export class GraphApi {
   }
 
   //TODO : typage du message
-  public async sendMessage(message: any) {
-    //TODO: delete before push
+  public async sendMessage(message: any, phoneNumberId: string) {
     return await this.sendRequest({
-      path: '',
+      path: `/${phoneNumberId}/messages`,
       payload: message,
       //formData,
     });
   }
 
-  public async getMediaUrl(mediaId: string): Promise<string> {
-    if (!mediaId) {
-      throw new Error('Media ID is required');
-    }
-    const path = `/${mediaId}`;
-
-    // Send the GET request to retrieve media URL
-    const mediaData = await this.sendRequest({
-      path: path,
-      method: 'GET',
-    });
-    if (mediaData && mediaData.url) {
-      return mediaData.url;
-    }
-    throw new Error('Failed to retrieve media URL');
-  }
 }
