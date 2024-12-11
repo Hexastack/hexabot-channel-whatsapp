@@ -6,10 +6,17 @@
  * 2. All derivative works must include clear attribution to the original creator and software, Hexastack and Hexabot, in a prominent location (e.g., in the software's "About" section, documentation, and README file).
  */
 
-import { DEFAULT_WHATSAPP_SETTINGS, WHATSAPP_GROUP_NAME } from './settings';
+import {
+  DEFAULT_WHATSAPP_SETTINGS,
+  WHATSAPP_GROUP_NAME,
+  WHATSAPP_CHANNEL_NAME,
+} from './settings';
 
 declare global {
   interface Settings extends SettingTree<typeof DEFAULT_WHATSAPP_SETTINGS> {}
+  interface SubscriberChannelDict {
+    [WHATSAPP_CHANNEL_NAME]: Record<string, never>;
+  }
 }
 
 declare module '@nestjs/event-emitter' {

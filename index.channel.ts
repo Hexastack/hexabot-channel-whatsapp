@@ -17,7 +17,6 @@ import { Attachment } from '@/attachment/schemas/attachment.schema';
 import { AttachmentService } from '@/attachment/services/attachment.service';
 import { ChannelService } from '@/channel/channel.service';
 import ChannelHandler from '@/channel/lib/Handler';
-import { ChannelName } from '@/channel/types';
 import { SubscriberCreateDto } from '@/chat/dto/subscriber.dto';
 import { FileType, WithUrl } from '@/chat/schemas/types/attachment';
 import {
@@ -520,7 +519,7 @@ export default class WhatsappHandler extends ChannelHandler<
       last_name: userData.verified_name,
       gender: 'unknown',
       channel: {
-        name: this.getName() as ChannelName,
+        name: this.getName(),
       },
       assignedAt: null,
       assignedTo: null,

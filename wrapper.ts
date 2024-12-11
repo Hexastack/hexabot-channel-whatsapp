@@ -20,6 +20,7 @@ import {
 import { Payload } from '@/chat/schemas/types/quick-reply';
 
 import WhatsappHandler from './index.channel';
+import { WHATSAPP_CHANNEL_NAME } from './settings';
 import { Whatsapp } from './types';
 
 type WhatsappEventAdapter =
@@ -48,7 +49,8 @@ type WhatsappEventAdapter =
 
 export default class WhatsappEventWrapper extends EventWrapper<
   WhatsappEventAdapter,
-  Whatsapp.Event
+  Whatsapp.Event,
+  typeof WHATSAPP_CHANNEL_NAME
 > {
   /**
    * Constructor : channel's event wrapper
@@ -187,10 +189,6 @@ export default class WhatsappEventWrapper extends EventWrapper<
 
   getAttachments(): AttachmentPayload<AttachmentForeignKey>[] {
     return [];
-  }
-
-  getChannelData(): any {
-    return this.get('channelData', {});
   }
 
   getSenderForeignId(): string {
