@@ -15,19 +15,28 @@ export class MediaAPI {
 
   //TODO: fix return typage
   public async getMediaUrl(mediaId: string): Promise<string> {
+    debugger;
     if (!mediaId) {
       throw new Error('Media ID is required');
     }
     const path = `/${mediaId}`;
 
-    // Send the GET request to retrieve media URL
-    const mediaData = await this.graphRequest.sendRequest({
-      path,
-      method: 'GET',
-    });
-    if (mediaData && mediaData.url) {
-      return mediaData.url;
+    try {
+      // Send the GET request to retrieve media URL
+      const mediaData = await this.graphRequest.sendRequest({
+        path,
+        method: 'GET',
+      });
+
+      if (mediaData && mediaData.url) {
+        // Extract and adjust the URL format (unescape it)
+        const formattedUrl = decodeURIComponent(mediaData.url); // Unescapes the URL
+        return formattedUrl;
+      } else {
+        throw new Error('URL not found in the response');
+      }
+    } catch (error) {
+      throw new Error('Failed to retrieve media URL');
     }
-    throw new Error('Failed to retrieve media URL');
   }
 }
