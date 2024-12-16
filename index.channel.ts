@@ -398,7 +398,7 @@ export default class WhatsappHandler extends ChannelHandler<
         action: {
           sections: [
             {
-              title: 'Title',
+              title: '',
               rows: message.elements.map((row: any) => ({
                 id: row.id,
                 title: row.title,
@@ -413,7 +413,7 @@ export default class WhatsappHandler extends ChannelHandler<
   }
 
   _carouselFormat() {
-    throw new Error('Method not implemented.');
+    throw new Error('Method not supported yet.');
   }
 
   /**
@@ -538,8 +538,7 @@ export default class WhatsappHandler extends ChannelHandler<
     options: BlockOptions,
     _context?: any,
   ): Promise<{ mid: string }> {
-    const handler: WhatsappHandler = this;
-    const message = handler._formatMessage(
+    const message = this._formatMessage(
       envelope,
       event.getSenderForeignId(),
       options,
