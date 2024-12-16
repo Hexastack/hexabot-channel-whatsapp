@@ -85,7 +85,7 @@ export namespace Whatsapp {
       contacts: UserData[];
       messages: IncomingMessageBase[];
       statuses: Statuses[];
-      errors: Error[];
+      errors?: Error[];
     };
     field: string;
   };
