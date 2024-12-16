@@ -62,6 +62,14 @@ export default class WhatsappEventWrapper extends EventWrapper<
     super(handler, event);
   }
 
+  /**
+   * Called by the parent constructor, it defines :
+   *     - The type of event received
+   *     - The type of message when the event is a message.
+   *     - Sets a typed raw object of the event data
+   *
+   * @param event - The message event received
+   */
   _init(event: Whatsapp.Event) {
     if (event.value.messages) {
       this._adapter.eventType = StdEventType.message;
@@ -89,6 +97,11 @@ export default class WhatsappEventWrapper extends EventWrapper<
     this._adapter.raw = event;
   }
 
+  /**
+   * Returns the message id
+   *
+   * @returns Message ID
+   */
   getId(): string {
     if (this._adapter.raw.value.messages[0].id) {
       return this._adapter.raw.value.messages[0].id;
@@ -96,6 +109,11 @@ export default class WhatsappEventWrapper extends EventWrapper<
     throw new Error('The message id is missing');
   }
 
+  /**
+   * Return payload whenever user clicks on a button/quick_reply or sends an attachment
+   *
+   * @returns The payload content
+   */
   getPayload(): Payload | string | undefined {
     if (this._adapter.eventType === StdEventType.message) {
       switch (this._adapter.messageType) {
@@ -129,6 +147,11 @@ export default class WhatsappEventWrapper extends EventWrapper<
     return undefined;
   }
 
+  /**
+   * Return a standard message format that can be stored in DB
+   *
+   * @returns  Received message in standard format
+   */
   getMessage(): StdIncomingMessage {
     if (this._adapter.eventType === StdEventType.echo) {
       throw new Error('Called getMessage() on a non-message event');
@@ -204,6 +227,10 @@ export default class WhatsappEventWrapper extends EventWrapper<
     return 0;
   }
 
+  /**
+   * Retrieves the phone number ID from the incoming event's metadata.
+   *
+   */
   getPhoneNumberId(): string {
     return this._adapter.raw.value.metadata.phone_number_id;
   }
