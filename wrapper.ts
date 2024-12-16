@@ -122,20 +122,8 @@ export default class WhatsappEventWrapper extends EventWrapper<
             },
           };
         }
+        //case IncomingMessageType.attachments
         // problem here is that whatsapp api doesn't return the media url
-        // case IncomingMessageType.attachments: {
-        //   const attachment: Whatsapp.Attachment =
-        //     this._adapter.raw.message.attachments[0];
-        //   return {
-        //     type: PayloadType.attachments,
-        //     attachments: {
-        //       type: <FileType>(<unknown>attachment.type),
-        //       payload: {
-        //         url: attachment?.payload?.url || '',
-        //       },
-        //     },
-        //   };
-        // }
       }
     }
     return undefined;
