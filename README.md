@@ -128,9 +128,9 @@ Once the extension is installed and configured, your Hexabot chatbot will be ava
 
 We welcome contributions from the community! Whether you want to report a bug, suggest new features, or submit a pull request, your input is valuable to us.
 
-Please refer to our contribution policy first : [How to contribute to Hexabot](./CONTRIBUTING.md)
+Please refer to our contribution policy first : [How to contribute to Hexabot](https://github.com/Hexastack/Hexabot/blob/main/CONTRIBUTING.md)
 
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](./CODE_OF_CONDUCT.md)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/Hexastack/Hexabot/blob/main/CODE_OF_CONDUCT.md)
 
 Feel free to join us on [Discord](https://discord.gg/rNb9t2MFkG)
 
@@ -144,3 +144,4 @@ This software is licensed under the GNU Affero General Public License v3.0 (AGPL
 ---
 
 *Happy Chatbot Building!*
+
