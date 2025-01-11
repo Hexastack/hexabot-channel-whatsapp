@@ -22,11 +22,11 @@ Before getting started, ensure you have the following:
 
 - A **Facebook account**.
 - A **Meta Developer Account**: [Register here](https://developers.facebook.com/docs/development/register).
-- A **Business App**: [Create one here](https://developers.facebook.com/docs/development/create-an-app).
+- An **App**: [Create one here](https://developers.facebook.com/docs/development/create-an-app).
 - Basic knowledge of **APIs** and **web development** (optional but helpful).
 - A **server** to host your chatbot (local servers can use [ngrok](https://ngrok.com/) or similar API gateways for testing).
 - **HTTPS** enabled on your server (required for webhooks).
-- A cloned copy of [Hexabot](https://github.com/hexastack/hexabot) on your local machine.
+- A new or existing [Hexabot project](https://docs.hexabot.ai/quickstart/installation).
 
 ---
 
@@ -46,7 +46,18 @@ Before getting started, ensure you have the following:
 
 ---
 
-### Step 2: Add the WhatsApp Product to Your App
+### Step 2: Create an APP
+
+    - Navigate to your app list on the **Apps** screen.
+    - **Create a new app**.
+    - Choose a **name** for your new app.
+    - Choose **Other** for your app use case
+    - Choose **Business** as type for your app.
+    - Submit your request and now you'll see your newly created app in your list of applications.
+
+---
+
+### Step 3: Add the WhatsApp Product to Your App
 
 1. **Add WhatsApp to Your App**:
    - If creating a new app, select **"Add products to your app"**.
@@ -56,16 +67,19 @@ Before getting started, ensure you have the following:
 
 ---
 
-### Step 3: Add a Recipient Number
+### Step 4: Add a Recipient Number
 
 1. **Navigate to WhatsApp API Setup**:
    - In the App Dashboard, go to **WhatsApp > API Setup**.
 2. **Add a Phone Number**:
    - Under **Send and Receive Messages**, click **Manage Phone Number List** and add a valid WhatsApp number.
+3. **Send a test message**:
+   - Under **Step2: send messages with API**, click **Send a message** and then your'll receive a message on your WhatsApp number.
+   - You will need to accept/allow messages from the test number.
 
 ---
 
-### Step 4: Generate an Access Token
+### Step 5: Generate an Access Token
 
 1. **Select Your App**:
    - In the App Dashboard, go to **WhatsApp > API Setup**.
@@ -75,7 +89,7 @@ Before getting started, ensure you have the following:
 
 ---
 
-### Step 5: Set Up a Webhook
+### Step 6: Set Up a Webhook
 
 Webhooks enable real-time updates from WhatsApp to your chatbot.
 
@@ -96,17 +110,20 @@ Webhooks enable real-time updates from WhatsApp to your chatbot.
 To configure the WhatsApp Channel Extension, you’ll need the following:
 
 ### 1. Webhook Verification Token
+
 - **Description**: A secure token used by WhatsApp to verify your webhook.
 - **Setup**:
   - Generate a token and configure it in both Hexabot and WhatsApp settings.
 
 ### 2. WhatsApp Access Token
+
 - **Description**: Grants your app access to the WhatsApp Business API.
 - **Setup**:
   - In the Developer Dashboard, go to **WhatsApp > Configuration**.
   - Generate the token and add it to your Hexabot configuration.
 
 ### 3. Facebook App Secret
+
 - **Description**: A secret key for securing communication between WhatsApp and your chatbot.
 - **Setup**:
   - Navigate to **App Settings > Basic** in the Developer Dashboard to retrieve the **App Secret**.
@@ -121,6 +138,14 @@ Once the extension is installed and configured, your Hexabot chatbot will be ava
 - Media messages
 - Quick replies
 - Interactive lists
+
+---
+
+## Note
+
+Currently, WhatsApp does not support URL buttons natively. As a workaround, we handle scenarios with a single URL button by leveraging WhatsApp's "Call to Action" (CTA) component.
+
+For cases requiring multiple URL buttons, you can create a specific flow tailored to the WhatsApp channel. This flow involves sending successive messages, each containing a single URL button attached as a CTA. By structuring your flow this way, you ensure that all URL buttons are presented effectively while adhering to WhatsApp's limitations.
 
 ---
 
@@ -143,5 +168,4 @@ This software is licensed under the GNU Affero General Public License v3.0 (AGPL
 
 ---
 
-*Happy Chatbot Building!*
-
+**_Happy Chatbot Building!_**
