@@ -412,21 +412,21 @@ export namespace WhatsApp {
     }
 
     // PaymentStatus type
-    interface PaymentStatus {
-      id: string;
-      from: string;
-      type: string; // Always "payment" for payment status update webhooks
-      status: 'captured' | 'failed' | 'pending'; // Payment status
-      payment: {
-        reference_id: string; // Unique reference ID
-      };
-      timestamp: string; // Timestamp for the webhook
-    }
+    // interface PaymentStatus {
+    //   id: string;
+    //   from: string;
+    //   type: string; // Always "payment" for payment status update webhooks
+    //   status: 'captured' | 'failed' | 'pending'; // Payment status
+    //   payment: {
+    //     reference_id: string; // Unique reference ID
+    //   };
+    //   timestamp: string; // Timestamp for the webhook
+    // }
 
     // OriginStatus type
-    interface OriginStatus {
-      type: 'business_initiated' | 'user_initiated' | 'referral_conversion'; // Conversation entry point
-    }
+    // interface OriginStatus {
+    //   type: 'business_initiated' | 'user_initiated' | 'referral_conversion'; // Conversation entry point
+    // }
 
     // PricingStatus type
     interface PricingStatus {

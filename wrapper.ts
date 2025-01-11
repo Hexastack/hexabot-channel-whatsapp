@@ -6,12 +6,9 @@
  * 2. All derivative works must include clear attribution to the original creator and software, Hexastack and Hexabot, in a prominent location (e.g., in the software's "About" section, documentation, and README file).
  */
 
+import { Attachment } from '@/attachment/schemas/attachment.schema';
 import EventWrapper from '@/channel/lib/EventWrapper';
-import {
-  AttachmentForeignKey,
-  AttachmentPayload,
-  FileType,
-} from '@/chat/schemas/types/attachment';
+import { AttachmentPayload } from '@/chat/schemas/types/attachment';
 import {
   IncomingMessageType,
   PayloadType,
@@ -29,36 +26,43 @@ type WhatsAppEventAdapter =
       eventType: StdEventType.unknown;
       messageType: never;
       raw: WhatsApp.Event;
+      attachment: never;
     }
   | {
       eventType: StdEventType.delivery;
       messageType: never;
       raw: WhatsApp.Webhook.Status;
+      attachment: never;
     }
   | {
       eventType: StdEventType.read;
       messageType: never;
       raw: WhatsApp.Webhook.Status;
+      attachment: never;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.message;
       raw: WhatsApp.Webhook.TextMessage;
+      attachment: never;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.attachments;
       raw: WhatsApp.Webhook.MediaMessage;
+      attachment: Attachment;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.location;
       raw: WhatsApp.Webhook.LocationMessage;
+      attachment: never;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.postback;
       raw: WhatsApp.Webhook.InteractiveMessage | WhatsApp.Webhook.ButtonMessage;
+      attachment: never;
     };
 
 export default class WhatsAppEventWrapper extends EventWrapper<
@@ -88,7 +92,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
    *
    * @param event - The message event received
    */
-  _init(event: WhatsApp.Event) {
+  async _init(event: WhatsApp.Event) {
     if ('status' in event) {
       switch (event.status) {
         case 'delivered':
@@ -117,6 +121,18 @@ export default class WhatsAppEventWrapper extends EventWrapper<
         case WhatsApp.Webhook.MessageType.Document:
         case WhatsApp.Webhook.MessageType.Sticker:
           this._adapter.messageType = IncomingMessageType.attachments;
+          const media =
+            event.type in event
+              ? (event[event.type] as WhatsApp.Webhook.Media)
+              : null;
+
+          if (!media) {
+            throw new Error('Unable to extract media object');
+          }
+
+          this._adapter.attachment = await (
+            this._handler as WhatsAppHandler
+          ).retrieveMedia(media, this.channelAttrs.metadata.phone_number_id);
           break;
         case WhatsApp.Webhook.MessageType.Button:
         case WhatsApp.Webhook.MessageType.Interactive:
@@ -173,14 +189,18 @@ export default class WhatsAppEventWrapper extends EventWrapper<
           };
         }
         case IncomingMessageType.attachments: {
-          const media = this._adapter.raw;
+          if (!this._adapter.attachment) {
+            throw new Error('Unable to find attachment');
+          }
+
+          const attachment = this._adapter.attachment;
+
           return {
             type: PayloadType.attachments,
             attachments: {
-              type: this.toFileType(media.type),
+              type: Attachment.getTypeByMime(attachment.type),
               payload: {
-                // @TODO : attachment url instead if id
-                url: media.id,
+                id: attachment.id,
               },
             },
           };
@@ -228,28 +248,24 @@ export default class WhatsAppEventWrapper extends EventWrapper<
         };
       }
       case IncomingMessageType.attachments: {
-        const media = this._adapter.raw;
-        const serialized = ['attachment'];
-        const type = this.toFileType(media.type);
-        const attachment = {
-          type: this.toFileType(media.type),
-          payload: {
-            // @TODO : attachment url instead if id
-            url: media.id,
-          },
-        };
-
-        if (media.type === WhatsApp.Webhook.MessageType.Sticker) {
-          serialized.concat(['sticker', media.sticker.id]);
-        } else {
-          // @TODO : attachment url instead if id
-          serialized.concat([type, media.id]);
+        if (!this._adapter.attachment) {
+          throw new Error('Unable to find attachment');
         }
+
+        const attachment = this._adapter.attachment;
+
+        const serialized = ['attachment'];
+        const type = Attachment.getTypeByMime(attachment.type);
+
+        serialized.concat([type, attachment.name]);
 
         return {
           type: PayloadType.attachments,
           serialized_text: serialized.join(':'),
-          attachment,
+          attachment: {
+            type,
+            payload: { id: attachment.id },
+          },
         };
       }
       default:
@@ -260,7 +276,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
   /**
    * @deprecated
    */
-  getAttachments(): AttachmentPayload<AttachmentForeignKey>[] {
+  getAttachments(): AttachmentPayload[] {
     return [];
   }
 
@@ -310,22 +326,6 @@ export default class WhatsAppEventWrapper extends EventWrapper<
    */
   getWatermark() {
     return parseInt(this._adapter.raw.timestamp);
-  }
-
-  /**
-   * Converts a message type to a file type
-   *
-   * @param type Message type
-   * @returns a standard file type
-   */
-  toFileType(type: WhatsApp.Webhook.MessageType) {
-    if (Object.values(FileType).includes(<FileType>(<unknown>type))) {
-      return <FileType>(<unknown>type);
-    } else if (type === WhatsApp.Webhook.MessageType.Document) {
-      return FileType.file;
-    } else {
-      return FileType.unknown;
-    }
   }
 
   /**
