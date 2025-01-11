@@ -1,6 +1,6 @@
 {
-  "app_secret": "Whatsapp App Secret",
-  "access_token": "Whatsapp Page Access Token",
+  "app_secret": "WhatsApp App Secret",
+  "access_token": "WhatsApp Access Token",
   "verify_token": "Webhook Verification Token",
   "get_started_button": "Enable `Get Started` button",
   "composer_input_disabled": "Disable composer input",

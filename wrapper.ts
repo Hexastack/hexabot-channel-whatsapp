@@ -10,6 +10,7 @@ import EventWrapper from '@/channel/lib/EventWrapper';
 import {
   AttachmentForeignKey,
   AttachmentPayload,
+  FileType,
 } from '@/chat/schemas/types/attachment';
 import {
   IncomingMessageType,
@@ -19,37 +20,50 @@ import {
 } from '@/chat/schemas/types/message';
 import { Payload } from '@/chat/schemas/types/quick-reply';
 
-import WhatsappHandler from './index.channel';
+import WhatsAppHandler from './index.channel';
 import { WHATSAPP_CHANNEL_NAME } from './settings';
-import { Whatsapp } from './types';
+import { WhatsApp } from './types';
 
-type WhatsappEventAdapter =
+type WhatsAppEventAdapter =
   | {
-      eventType: StdEventType.message | StdEventType.echo;
-      messageType: IncomingMessageType.message;
-      raw: Whatsapp.IncomingMessage;
+      eventType: StdEventType.unknown;
+      messageType: never;
+      raw: WhatsApp.Event;
     }
   | {
-      eventType: StdEventType.message | StdEventType.echo;
+      eventType: StdEventType.delivery;
+      messageType: never;
+      raw: WhatsApp.Webhook.Status;
+    }
+  | {
+      eventType: StdEventType.read;
+      messageType: never;
+      raw: WhatsApp.Webhook.Status;
+    }
+  | {
+      eventType: StdEventType.message;
+      messageType: IncomingMessageType.message;
+      raw: WhatsApp.Webhook.TextMessage;
+    }
+  | {
+      eventType: StdEventType.message;
       messageType: IncomingMessageType.attachments;
-      raw: Whatsapp.IncomingMessage;
+      raw: WhatsApp.Webhook.MediaMessage;
+    }
+  | {
+      eventType: StdEventType.message;
+      messageType: IncomingMessageType.location;
+      raw: WhatsApp.Webhook.LocationMessage;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.postback;
-      raw: Whatsapp.IncomingPostback;
-    }
-  | {
-      eventType: StdEventType.message | StdEventType.echo;
-      messageType:
-        | IncomingMessageType.location
-        | IncomingMessageType.attachments;
-      raw: Whatsapp.IncomingMessage;
+      raw: WhatsApp.Webhook.InteractiveMessage | WhatsApp.Webhook.ButtonMessage;
     };
 
-export default class WhatsappEventWrapper extends EventWrapper<
-  WhatsappEventAdapter,
-  Whatsapp.Event,
+export default class WhatsAppEventWrapper extends EventWrapper<
+  WhatsAppEventAdapter,
+  WhatsApp.Event,
   typeof WHATSAPP_CHANNEL_NAME
 > {
   /**
@@ -58,8 +72,12 @@ export default class WhatsappEventWrapper extends EventWrapper<
    * @param handler - The channel's handler
    * @param event - The message event received
    */
-  constructor(handler: WhatsappHandler, event: Whatsapp.Event) {
-    super(handler, event);
+  constructor(
+    handler: WhatsAppHandler,
+    event: WhatsApp.Event,
+    channelData: SubscriberChannelDict[typeof WHATSAPP_CHANNEL_NAME],
+  ) {
+    super(handler, event, channelData);
   }
 
   /**
@@ -70,29 +88,47 @@ export default class WhatsappEventWrapper extends EventWrapper<
    *
    * @param event - The message event received
    */
-  _init(event: Whatsapp.Event) {
-    if (event.value.messages) {
+  _init(event: WhatsApp.Event) {
+    if ('status' in event) {
+      switch (event.status) {
+        case 'delivered':
+          this._adapter.eventType = StdEventType.delivery;
+          break;
+        case 'read':
+          this._adapter.eventType = StdEventType.read;
+          break;
+        default:
+          this._adapter.eventType = StdEventType.unknown;
+          break;
+      }
+    } else {
       this._adapter.eventType = StdEventType.message;
-      if (event.value.messages[0].type === Whatsapp.messageType.text) {
-        this._adapter.messageType = IncomingMessageType.message;
+      switch (event.type) {
+        case WhatsApp.Webhook.MessageType.Contacts:
+          // @ts-expect-error We will consider contacts messages as text
+          event.text = this.serializeContactsToText(event.contacts);
+        case WhatsApp.Webhook.MessageType.Text:
+          this._adapter.messageType = IncomingMessageType.message;
+          break;
+
+        case WhatsApp.Webhook.MessageType.Image:
+        case WhatsApp.Webhook.MessageType.Audio:
+        case WhatsApp.Webhook.MessageType.Video:
+        case WhatsApp.Webhook.MessageType.Document:
+        case WhatsApp.Webhook.MessageType.Sticker:
+          this._adapter.messageType = IncomingMessageType.attachments;
+          break;
+        case WhatsApp.Webhook.MessageType.Button:
+        case WhatsApp.Webhook.MessageType.Interactive:
+          this._adapter.messageType = IncomingMessageType.postback;
+          break;
+        case WhatsApp.Webhook.MessageType.Location:
+          this._adapter.messageType = IncomingMessageType.location;
+          break;
+        default:
+          this._adapter.eventType = StdEventType.unknown;
+          break;
       }
-      if (event.value.messages[0].type === Whatsapp.messageType.location) {
-        this._adapter.messageType = IncomingMessageType.location;
-      }
-      if (
-        event.value.messages[0].hasOwnProperty('interactive') &&
-        (event.value.messages[0].interactive.hasOwnProperty('button_reply') ||
-          event.value.messages[0].interactive.hasOwnProperty('list_reply'))
-      ) {
-        this._adapter.messageType = IncomingMessageType.postback;
-      }
-      if (event.value.messages[0].hasOwnProperty('image')) {
-        this._adapter.messageType = IncomingMessageType.attachments;
-      }
-    }
-    if (event.value.statuses) {
-      //echo message
-      this._adapter.eventType = StdEventType.echo;
     }
     this._adapter.raw = event;
   }
@@ -103,14 +139,11 @@ export default class WhatsappEventWrapper extends EventWrapper<
    * @returns Message ID
    */
   getId(): string {
-    if (this._adapter.raw.value.messages[0].id) {
-      return this._adapter.raw.value.messages[0].id;
-    }
-    throw new Error('The message id is missing');
+    return this._adapter.raw.id;
   }
 
   /**
-   * Return payload whenever user clicks on a button/quick_reply or sends an attachment
+   * Return payload whenever user clicks on a button/quick reply or sends an attachment
    *
    * @returns The payload content
    */
@@ -118,20 +151,19 @@ export default class WhatsappEventWrapper extends EventWrapper<
     if (this._adapter.eventType === StdEventType.message) {
       switch (this._adapter.messageType) {
         case IncomingMessageType.postback: {
-          if (
-            this._adapter.raw.value.messages[0].hasOwnProperty('button_reply')
-          )
-            return this._adapter.raw.value.messages[0].interactive.button_reply
-              .id;
-          else if (
-            this._adapter.raw.value.messages[0].hasOwnProperty('list_reply')
-          )
-            return this._adapter.raw.value.messages[0].interactive.list_reply
-              .id;
-          break;
+          const event = this._adapter.raw;
+          if ('interactive' in event) {
+            return (
+              event.interactive.button_reply?.id ||
+              event.interactive.list_reply.id
+            );
+          } else {
+            return event.button.payload;
+          }
         }
         case IncomingMessageType.location: {
-          const coordinates = this._adapter.raw.value.messages[0].location;
+          const event = this._adapter.raw as WhatsApp.Webhook.LocationMessage;
+          const coordinates = event.location;
           return {
             type: PayloadType.location,
             coordinates: {
@@ -140,8 +172,19 @@ export default class WhatsappEventWrapper extends EventWrapper<
             },
           };
         }
-        //case IncomingMessageType.attachments
-        // problem here is that whatsapp api doesn't return the media url
+        case IncomingMessageType.attachments: {
+          const media = this._adapter.raw;
+          return {
+            type: PayloadType.attachments,
+            attachments: {
+              type: this.toFileType(media.type),
+              payload: {
+                // @TODO : attachment url instead if id
+                url: media.id,
+              },
+            },
+          };
+        }
       }
     }
     return undefined;
@@ -153,37 +196,29 @@ export default class WhatsappEventWrapper extends EventWrapper<
    * @returns  Received message in standard format
    */
   getMessage(): StdIncomingMessage {
-    if (this._adapter.eventType === StdEventType.echo) {
-      throw new Error('Called getMessage() on a non-message event');
-    }
     switch (this._adapter.messageType) {
       case IncomingMessageType.message:
         return {
-          text: this._adapter.raw.value.messages[0].text.body,
+          text: this._adapter.raw.text.body,
         };
       case IncomingMessageType.postback: {
-        if (
-          this._adapter.raw.value.messages[0].interactive.type ===
-          'button_reply'
-        )
+        if ('interactive' in this._adapter.raw) {
+          const interactive = this._adapter.raw.interactive;
           return {
             postback:
-              this._adapter.raw.value.messages[0].interactive.button_reply.id,
-            text: this._adapter.raw.value.messages[0].interactive.button_reply
-              .title,
+              interactive.button_reply?.id || interactive.list_reply?.id,
+            text:
+              interactive.button_reply?.title || interactive.list_reply?.title,
           };
-        else if (
-          this._adapter.raw.value.messages[0].interactive.type === 'list_reply'
-        )
+        } else {
           return {
-            postback:
-              this._adapter.raw.value.messages[0].interactive.list_reply.id,
-            text: this._adapter.raw.value.messages[0].interactive.list_reply
-              .title,
+            postback: this._adapter.raw.button.payload,
+            text: this._adapter.raw.button.text,
           };
+        }
       }
       case IncomingMessageType.location: {
-        const coordinates = this._adapter.raw.value.messages[0].location;
+        const coordinates = this._adapter.raw.location;
         return {
           type: PayloadType.location,
           coordinates: {
@@ -192,46 +227,191 @@ export default class WhatsappEventWrapper extends EventWrapper<
           },
         };
       }
-      //case IncomingMessageType.attachement
+      case IncomingMessageType.attachments: {
+        const media = this._adapter.raw;
+        const serialized = ['attachment'];
+        const type = this.toFileType(media.type);
+        const attachment = {
+          type: this.toFileType(media.type),
+          payload: {
+            // @TODO : attachment url instead if id
+            url: media.id,
+          },
+        };
+
+        if (media.type === WhatsApp.Webhook.MessageType.Sticker) {
+          serialized.concat(['sticker', media.sticker.id]);
+        } else {
+          // @TODO : attachment url instead if id
+          serialized.concat([type, media.id]);
+        }
+
+        return {
+          type: PayloadType.attachments,
+          serialized_text: serialized.join(':'),
+          attachment,
+        };
+      }
       default:
-        throw new Error('Unknown incoming message type');
+        return undefined;
     }
   }
 
+  /**
+   * @deprecated
+   */
   getAttachments(): AttachmentPayload<AttachmentForeignKey>[] {
     return [];
   }
 
+  /**
+   * Returns event sender (subscriber) phone number
+   *
+   * @returns Subscriber phone number
+   */
   getSenderForeignId(): string {
-    return this._adapter.raw.value.messages[0].from;
-  }
-
-  getRecipientForeignId(): string {
-    if (this.getEventType() === StdEventType.echo) return null;
-    return null;
-  }
-
-  getEventType(): StdEventType {
-    return this._adapter.eventType;
-  }
-
-  getMessageType(): IncomingMessageType {
-    return this._adapter.messageType || IncomingMessageType.unknown;
-  }
-
-  getDeliveredMessages(): string[] {
-    return [];
-  }
-
-  getWatermark() {
-    return 0;
+    if (this._adapter.eventType === StdEventType.message) {
+      return this._adapter.raw.from;
+    }
+    return undefined;
   }
 
   /**
-   * Retrieves the phone number ID from the incoming event's metadata.
+   * Returns event recipient phone number
    *
+   * @returns Subscriber phone number
    */
-  getPhoneNumberId(): string {
-    return this._adapter.raw.value.metadata.phone_number_id;
+  getRecipientForeignId(): string {
+    if ('recipient_id' in this._adapter.raw) {
+      return this._adapter.raw.recipient_id;
+    }
+    return undefined;
+  }
+
+  /**
+   * Return the delivered messages ids
+   *
+   * @returns return delivered messages ids
+   */
+  getDeliveredMessages(): string[] {
+    if (
+      this._adapter.eventType === StdEventType.delivery &&
+      this._adapter.raw.status === 'delivered'
+    ) {
+      return [this._adapter.raw.id];
+    }
+    return [];
+  }
+
+  /**
+   * Return the event's timestamp
+   *
+   * @returns The timestamp
+   */
+  getWatermark() {
+    return parseInt(this._adapter.raw.timestamp);
+  }
+
+  /**
+   * Converts a message type to a file type
+   *
+   * @param type Message type
+   * @returns a standard file type
+   */
+  toFileType(type: WhatsApp.Webhook.MessageType) {
+    if (Object.values(FileType).includes(<FileType>(<unknown>type))) {
+      return <FileType>(<unknown>type);
+    } else if (type === WhatsApp.Webhook.MessageType.Document) {
+      return FileType.file;
+    } else {
+      return FileType.unknown;
+    }
+  }
+
+  /**
+   * Serialize contacts to a string
+   *
+   * @param contacts Array of message contacts
+   * @returns A text containing the contacts
+   */
+  private serializeContactsToText(
+    contacts: WhatsApp.Messages.Contact[],
+  ): string {
+    return contacts
+      .reduce((result, contact) => {
+        const lines: string[] = [];
+
+        // Name
+        lines.push(`Name: ${contact.name.formatted_name}`);
+        if (contact.name.first_name)
+          lines.push(`  First Name: ${contact.name.first_name}`);
+        if (contact.name.last_name)
+          lines.push(`  Last Name: ${contact.name.last_name}`);
+        if (contact.name.middle_name)
+          lines.push(`  Middle Name: ${contact.name.middle_name}`);
+        if (contact.name.prefix) lines.push(`  Prefix: ${contact.name.prefix}`);
+        if (contact.name.suffix) lines.push(`  Suffix: ${contact.name.suffix}`);
+
+        // Birthday
+        if (contact.birthday) {
+          lines.push(`Birthday: ${contact.birthday}`);
+        }
+
+        // Organization
+        if (contact.org) {
+          lines.push(`Organization:`);
+          if (contact.org.company)
+            lines.push(`  Company: ${contact.org.company}`);
+          if (contact.org.department)
+            lines.push(`  Department: ${contact.org.department}`);
+          if (contact.org.title) lines.push(`  Title: ${contact.org.title}`);
+        }
+
+        // Emails
+        if (contact.emails?.length) {
+          lines.push(`Emails:`);
+          contact.emails.forEach((email) => {
+            lines.push(
+              `  - Email: ${email.email || 'N/A'}, Type: ${email.type || 'N/A'}`,
+            );
+          });
+        }
+
+        // Phones
+        if (contact.phones?.length) {
+          lines.push(`Phones:`);
+          contact.phones.forEach((phone) => {
+            lines.push(
+              `  - Phone: ${phone.phone || 'N/A'}, Type: ${phone.type || 'N/A'}, WhatsApp ID: ${phone.wa_id || 'N/A'}`,
+            );
+          });
+        }
+
+        // Addresses
+        if (contact.addresses?.length) {
+          lines.push(`Addresses:`);
+          contact.addresses.forEach((address) => {
+            lines.push(
+              `  - Street: ${address.street || 'N/A'}, City: ${address.city || 'N/A'}, State: ${
+                address.state || 'N/A'
+              }, ZIP: ${address.zip || 'N/A'}, Country: ${address.country || 'N/A'}, Country Code: ${
+                address.country_code || 'N/A'
+              }, Type: ${address.type || 'N/A'}`,
+            );
+          });
+        }
+
+        // URLs
+        if (contact.urls?.length) {
+          lines.push(`URLs:`);
+          contact.urls.forEach((url) => {
+            lines.push(`  - ${url}`);
+          });
+        }
+
+        // Add a blank line between contacts
+        return result + lines.join('\n') + '\n\n';
+      }, '')
+      .trim(); // Remove trailing newline
   }
 }

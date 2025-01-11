@@ -19,6 +19,7 @@ import { ChannelService } from '@/channel/channel.service';
 import ChannelHandler from '@/channel/lib/Handler';
 import { SubscriberCreateDto } from '@/chat/dto/subscriber.dto';
 import { FileType, WithUrl } from '@/chat/schemas/types/attachment';
+import { ButtonType, PostBackButton } from '@/chat/schemas/types/button';
 import {
   OutgoingMessageFormat,
   StdEventType,
@@ -33,6 +34,7 @@ import { BlockOptions } from '@/chat/schemas/types/options';
 import { LabelService } from '@/chat/services/label.service';
 import { MessageService } from '@/chat/services/message.service';
 import { SubscriberService } from '@/chat/services/subscriber.service';
+import { Content } from '@/cms/schemas/content.schema';
 import { MenuService } from '@/cms/services/menu.service';
 import { I18nService } from '@/i18n/services/i18n.service';
 import { LanguageService } from '@/i18n/services/language.service';
@@ -42,11 +44,11 @@ import { SettingService } from '@/setting/services/setting.service';
 
 import { GraphApi } from './lib/graph-api';
 import { WHATSAPP_CHANNEL_NAME } from './settings';
-import { Whatsapp } from './types';
-import WhatsappEventWrapper from './wrapper';
+import { WhatsApp } from './types';
+import WhatsAppEventWrapper from './wrapper';
 
 @Injectable()
-export default class WhatsappHandler extends ChannelHandler<
+export default class WhatsAppHandler extends ChannelHandler<
   typeof WHATSAPP_CHANNEL_NAME
 > {
   protected api: GraphApi;
@@ -77,7 +79,7 @@ export default class WhatsappHandler extends ChannelHandler<
    * Logs a debug message indicating the initialization of the WhatsApp Channel Handler.
    */
   async init(): Promise<void> {
-    this.logger.debug('WhatsApp Channel Handler : initialization ...');
+    this.logger.debug('WhatsApp Channel Handler: initialization ...');
     const settings = await this.getSettings();
     this.api = new GraphApi(
       this.httpService,
@@ -101,18 +103,18 @@ export default class WhatsappHandler extends ChannelHandler<
    * - The validation tokens do not match.
    */
   async subscribe(req: Request, res: Response) {
-    this.logger.debug('WhatsApp Channel Handler : Subscribing ...');
+    this.logger.debug('WhatsApp Channel Handler: Subscribing ...');
     const data: any = req.query;
     const settings = await this.getSettings();
     const verifyToken = settings.verify_token;
     if (!verifyToken) {
       return res.status(500).json({
-        err: 'WhatsApp Channel Handler : You need to specify a verifyToken in your config.',
+        err: 'WhatsApp Channel Handler: You need to specify a verifyToken in your config.',
       });
     }
     if (!data || !data['hub.mode'] || !data['hub.verify_token']) {
       return res.status(500).json({
-        err: 'WhatsApp Channel Handler : Did not recieve any verification token.',
+        err: 'WhatsApp Channel Handler: Did not recieve any verification token.',
       });
     }
     if (
@@ -120,25 +122,25 @@ export default class WhatsappHandler extends ChannelHandler<
       data['hub.verify_token'] === verifyToken
     ) {
       this.logger.log(
-        'WhatsApp Channel Handler : Subscription token has been verified successfully!',
+        'WhatsApp Channel Handler: Subscription token has been verified successfully!',
       );
       return res.status(200).send(data['hub.challenge']);
     } else {
       this.logger.error(
-        'WhatsApp Channel Handler : Failed validation. Make sure the validation tokens match.',
+        'WhatsApp Channel Handler: Failed validation. Make sure the validation tokens match.',
       );
       return res.status(500).json({
-        err: 'WhatsApp Channel Handler : Failed validation. Make sure the validation tokens match.',
+        err: 'WhatsApp Channel Handler: Failed validation. Make sure the validation tokens match.',
       });
     }
   }
 
   _validateMessage(req: Request, res: Response, next: () => void) {
-    const data: any = req.body;
+    const data: WhatsApp.Webhook.Notification = req.body;
 
     if (data.object !== 'whatsapp_business_account') {
       this.logger.warn(
-        'Whatsapp Channel Handler : Missing `whatsapp_business_account` attribute!',
+        'WhatsApp Channel Handler: Missing `whatsapp_business_account` attribute!',
         data,
       );
       return res
@@ -186,7 +188,7 @@ export default class WhatsappHandler extends ChannelHandler<
 
     if (signatureHash !== expectedHash) {
       this.logger.warn(
-        "Messenger Channel Handler : Couldn't match the request signature.",
+        "WhatsApp Channel Handler: Couldn't match the request signature.",
         signatureHash,
         expectedHash,
       );
@@ -195,7 +197,7 @@ export default class WhatsappHandler extends ChannelHandler<
         .json({ err: "Couldn't match the request signature." });
     }
     this.logger.debug(
-      'Messenger Channel Handler : Request signature has been validated.',
+      'WhatsApp Channel Handler: Request signature has been validated.',
     );
     return next();
   }
@@ -203,10 +205,10 @@ export default class WhatsappHandler extends ChannelHandler<
   /**
    * Main handler for processing incoming webhook requests from the WhatsApp channel.
    *
-   * @param {Request} req - The incoming HTTP request object.
-   * @param {Response} res - The outgoing HTTP response object.
+   * @param req - The incoming HTTP request object.
+   * @param res - The outgoing HTTP response object.
    *
-   * @returns {Promise<void>} Resolves with an HTTP response indicating the processing status.
+   * @returns Resolves with an HTTP response indicating the processing status.
    *
    * @throws Will return a 500 status code with an error message if:
    * - Signature verification fails.
@@ -214,7 +216,7 @@ export default class WhatsappHandler extends ChannelHandler<
    * - An error occurs while handling events.
    */
   async handle(req: Request, res: Response) {
-    const handler: WhatsappHandler = this;
+    const handler: WhatsAppHandler = this;
 
     // Handle webhook subscribe notifications
     if (req.method === 'GET') {
@@ -222,39 +224,58 @@ export default class WhatsappHandler extends ChannelHandler<
     }
     return handler._verifySignature(req, res, () => {
       return handler._validateMessage(req, res, () => {
-        const data = req.body;
+        const data = req.body as WhatsApp.Webhook.Notification;
         this.logger.debug(
-          'Whatsapp Channel Handler : Webhook notification received.',
+          'WhatsApp Channel Handler: Webhook notification received.',
         );
         // Check notification
         if (!('entry' in data)) {
           this.logger.error(
-            'Whatsapp Channel Handler : Webhook received no entry data.',
+            'WhatsApp Channel Handler: Webhook received no entry data.',
           );
           return res.status(500).json({
-            err: 'Whatsapp Channel Handler : Webhook received no entry data.',
+            err: 'WhatsApp Channel Handler: Webhook received no entry data.',
           });
         }
 
-        data.entry.forEach((entry: any) => {
-          entry.changes.forEach((e: Whatsapp.Event) => {
-            try {
-              const event = new WhatsappEventWrapper(handler, e);
-              const type: StdEventType = event.getEventType();
-              if (type) {
-                this.eventEmitter.emit(`hook:chatbot:${type}`, event);
-              } else {
+        data.entry.forEach((entry) => {
+          entry.changes.forEach((change) => {
+            const messageEvents = (change.value.messages || []).map(
+              (message) => {
+                const contact = change.value.contacts.find(
+                  ({ wa_id }) => wa_id === message.from,
+                );
+                return new WhatsAppEventWrapper(handler, message, {
+                  metadata: change.value.metadata,
+                  contact,
+                });
+              },
+            );
+            const statusEvents = (change.value.statuses || []).map((status) => {
+              return new WhatsAppEventWrapper(handler, status, {
+                metadata: change.value.metadata,
+              });
+            });
+            // Handle messages & statues
+            [...messageEvents, ...statusEvents].forEach((event) => {
+              try {
+                const type: StdEventType = event.getEventType();
+
+                if (type) {
+                  this.eventEmitter.emit(`hook:chatbot:${type}`, event);
+                } else {
+                  this.logger.debug(
+                    'WhatsApp Channel Handler: Webhook received unknown event',
+                    event,
+                  );
+                }
+              } catch (err) {
                 this.logger.error(
-                  'Whatsapp Channel Handler : Webhook received unknown event ',
-                  event,
+                  'WhatsApp Channel Handler: Something went wrong while handling events',
+                  err,
                 );
               }
-            } catch (err) {
-              this.logger.error(
-                'Whatsapp Channel Handler : Something went wrong while handling events',
-                err,
-              );
-            }
+            });
           });
         });
         return res.status(200).json({ success: true });
@@ -263,177 +284,167 @@ export default class WhatsappHandler extends ChannelHandler<
   }
 
   /**
+   * Truncate text to a specified length, appending "..." if needed.
+   *
+   * @param text - The text to truncate.
+   * @param maxLength - The maximum length of the truncated text.
+   * @returns - The truncated text.
+   */
+  private truncateText(text: string, maxLength: number) {
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return text.slice(0, maxLength - 3) + '...';
+  }
+
+  /**
    * Formats an outgoing message based on its specified format type.
    *
-   * @param {StdOutgoingEnvelope} envelope - The envelope containing the message and its format.
-   * @param {string} recipient_id - The recipient's ID.
-   * @param {BlockOptions} options - Optional configurations for message customization.
+   * @param envelope - The envelope containing the message and its format.
+   * @param options - Optional configurations for message customization.
    *
-   * @returns {Whatsapp.OutgoingMessageBase} The formatted message.
-   *
-   * @throws {Error} If the message format is unknown.
+   * @returns The formatted message.
    */
   _formatMessage(
     envelope: StdOutgoingEnvelope,
-    recipient_id: string,
     options: BlockOptions,
-  ): Whatsapp.OutgoingMessageBase {
+  ): WhatsApp.Messages.AnyMessage {
     switch (envelope.format) {
-      // case OutgoingMessageFormat.carousel:
-      //   return this._carouselFormat(envelope.message,recipient_id, options);
       case OutgoingMessageFormat.buttons:
-        return this._buttonsFormat(envelope.message, recipient_id, options);
+        return this._buttonsFormat(envelope.message, options);
+      case OutgoingMessageFormat.carousel:
+        return this._carouselFormat(envelope.message, options);
       case OutgoingMessageFormat.list:
-        return this._listFormat(envelope.message, recipient_id, options);
+        return this._listFormat(envelope.message, options);
       case OutgoingMessageFormat.quickReplies:
-        return this._quickRepliesFormat(
-          envelope.message,
-          recipient_id,
-          options,
-        );
+        return this._quickRepliesFormat(envelope.message, options);
       case OutgoingMessageFormat.text:
-        return this._textFormat(envelope.message, recipient_id, options);
+        return this._textFormat(envelope.message, options);
       case OutgoingMessageFormat.attachment:
-        return this._attachmentFormat(envelope.message, recipient_id, options);
+        return this._attachmentFormat(envelope.message, options);
       default:
         throw new Error('Unknown message format');
-    }
-  }
-
-  castAttachmentType(type: FileType): Whatsapp.AttachmentType {
-    if (type === FileType.file) {
-      return Whatsapp.AttachmentType.document;
-    } else {
-      return type as unknown as Whatsapp.AttachmentType;
     }
   }
 
   /**
    * Formats an attachment message for the WhatsApp API.
    *
-   * @param {StdOutgoingAttachmentMessage<WithUrl<Attachment>>} message - The outgoing attachment message details.
-   * @param {string} recipient_id - The recipient's ID.
-   * @param {BlockOptions} [_options] - Optional configuration for message customization.
+   * @param message - The outgoing attachment message details.
+   * @param _options - Optional configuration for message customization.
    *
-   * @returns {Whatsapp.AttachmentTemplate} The formatted attachment message object.
-   *
-   * @throws {Error} If the attachment type is unsupported.
+   * @returns The formatted attachment message object.
    */
   _attachmentFormat(
     message: StdOutgoingAttachmentMessage<WithUrl<Attachment>>,
-    recipient_id: string,
     _options?: BlockOptions,
-  ): Whatsapp.AttachmentTemplate {
-    const { ...restAttachment } = message.attachment;
-    const type = this.castAttachmentType(message.attachment.type);
-    const outgoingMessage: Whatsapp.AttachmentTemplate = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient_id,
-      // @ts-expect-error to check
-      type,
-      ...restAttachment,
+  ): WhatsApp.Messages.AnyMediaMessage {
+    const attachment = message.attachment.payload;
+    const link = Attachment.getAttachmentUrl(attachment.id, attachment.name);
+    const media: WhatsApp.Messages.Media = {
+      link,
+      // caption: attachment.name,
+      // filename: attachment.name,
     };
-    const link = message.attachment.payload.url.replace(
-      'localhost:4000',
-      '', //ngrok link
-    );
-    switch (type) {
-      case Whatsapp.AttachmentType.image:
-        outgoingMessage.image = {
-          link,
-          caption: message.attachment.payload.name || '',
-        };
-        break;
-      case Whatsapp.AttachmentType.document:
-        outgoingMessage.type = type;
-        outgoingMessage.document = {
-          link,
-          caption: message.attachment.payload.name || '',
-          filename: message.attachment.payload.name || '',
-        };
-        break;
-      case Whatsapp.AttachmentType.video:
-        outgoingMessage.video = {
-          link,
-          caption: message.attachment.payload.name || '',
-        };
-        break;
-      case Whatsapp.AttachmentType.audio:
-        outgoingMessage.audio = {
-          id: message.attachment.payload.id,
-        };
-        break;
-      default:
-        throw new Error(`Unsupported attachment type: ${type}`);
-    }
 
-    return outgoingMessage;
+    switch (message.attachment.type) {
+      case FileType.image:
+        return {
+          type: WhatsApp.Messages.MediaType.Image,
+          image: media,
+        };
+      case FileType.audio:
+        return {
+          type: WhatsApp.Messages.MediaType.Audio,
+          audio: media,
+        };
+      case FileType.video:
+        return {
+          type: WhatsApp.Messages.MediaType.Video,
+          video: media,
+        };
+      case FileType.file:
+        return {
+          type: WhatsApp.Messages.MediaType.Document,
+          document: media,
+        };
+      default:
+        throw new Error('Unknown file type!');
+    }
   }
 
   /**
    * Formats a list-based interactive message for the WhatsApp API.
    *
-   * @param {StdOutgoingListMessage} message - The outgoing list message details.
-   * @param {string} recipient_id - The recipient's ID.
-   * @param {BlockOptions} [_options] - Optional configuration for message customization.
+   * @param message - The outgoing list message details.
+   * @param options - Optional configuration for message customization.
    *
-   * @returns {Whatsapp.OutgoingMessageBase} The formatted interactive list message object.
+   * @returns The formatted interactive list message object.
    */
   _listFormat(
     message: StdOutgoingListMessage,
-    recipient_id: string,
-    _options?: BlockOptions,
-  ): Whatsapp.OutgoingMessageBase {
+    options: BlockOptions,
+  ): WhatsApp.Messages.InteractiveMessage {
+    const fields = options.content.fields;
+    const rows: WhatsApp.Messages.Row[] = message.elements.map((item) => {
+      const postback = Content.getPayload(item);
+      return {
+        id: postback,
+        title: item[fields.title],
+        description: item[fields.subtitle]
+          ? this.truncateText(item[fields.subtitle], 72)
+          : undefined, // Optional: Include if available
+      };
+    });
+    const btnText = message.options.buttons[0].title;
     return {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient_id,
       type: 'interactive',
       interactive: {
-        type: 'list',
+        type: WhatsApp.Messages.InteractiveType.List,
         body: {
-          text: message.options.fields.title,
+          text: this.i18n.t('Click on "{btnText}" to display the list:', {
+            args: { btnText },
+          }),
         },
         action: {
           sections: [
             {
-              title: '',
-              rows: message.elements.map((row: any) => ({
-                id: row.id,
-                title: row.title,
-                description: row.description, // Optional: Include if available
-              })),
+              title: 'Section',
+              rows,
             },
           ],
-          button: message.options.buttons[0].title,
+          button: btnText,
         },
       },
     };
   }
 
-  _carouselFormat() {
-    throw new Error('Method not supported yet.');
+  /**
+   * Carousel format is not supported in WhatsApp, so we will be using
+   * List format instead.
+   *
+   * @param message - The outgoing list message details.
+   * @param options - Optional configuration for message customization.
+   *
+   * @returns The formatted interactive list message object.
+   */
+  _carouselFormat(message: StdOutgoingListMessage, options: BlockOptions) {
+    return this._listFormat(message, options);
   }
 
   /**
    * Formats a text message for the WhatsApp API.
    *
-   * @param {StdOutgoingTextMessage} message - The outgoing text message details.
-   * @param {string} recipient_id - The recipient's ID.
-   * @param {BlockOptions} [_options] - Optional configuration for message customization.
+   * @param message - The outgoing text message details.
+   * @param _options - Optional configuration for message customization.
    *
-   * @returns {Whatsapp.OutgoingMessageBase} The formatted message object.
+   * @returns The formatted message object.
    */
   _textFormat(
     message: StdOutgoingTextMessage,
-    recipient_id: string,
     _options?: BlockOptions,
-  ): Whatsapp.OutgoingMessageBase {
+  ): WhatsApp.Messages.TextMessage {
     return {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient_id,
       type: 'text',
       text: {
         body: message.text,
@@ -444,35 +455,33 @@ export default class WhatsappHandler extends ChannelHandler<
   /**
    * Formats a quick-replies interactive message for the WhatsApp API.
    *
-   * @param {StdOutgoingQuickRepliesMessage} message - The outgoing quick-replies message details.
-   * @param {string} recipient_id - The recipient's ID.
-   * @param {BlockOptions} [_options] - Optional configuration for message customization.
+   * @param message - The outgoing quick-replies message details.
+   * @param _options - Optional configuration for message customization.
    *
-   * @returns {Whatsapp.OutgoingMessageBase} The formatted interactive message object with quick replies.
+   * @returns The formatted interactive message object with quick replies.
    */
   _quickRepliesFormat(
     message: StdOutgoingQuickRepliesMessage,
-    recipient_id: string,
     _options?: BlockOptions,
-  ): Whatsapp.OutgoingMessageBase {
+  ): WhatsApp.Messages.InteractiveMessage {
+    const buttons: WhatsApp.Messages.ReplyButton[] = message.quickReplies.map(
+      ({ payload, title }) => ({
+        type: 'reply',
+        reply: {
+          id: payload,
+          title,
+        },
+      }),
+    );
     return {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient_id,
       type: 'interactive',
       interactive: {
-        type: 'button',
+        type: WhatsApp.Messages.InteractiveType.Button,
         body: {
           text: message.text,
         },
         action: {
-          buttons: message.quickReplies.map((quickReply: any) => ({
-            type: 'reply',
-            reply: {
-              id: quickReply.payload,
-              title: quickReply.title,
-            },
-          })),
+          buttons,
         },
       },
     };
@@ -481,99 +490,117 @@ export default class WhatsappHandler extends ChannelHandler<
   /**
    * Formats a button-based interactive message for the WhatsApp API.
    *
-   * @param {StdOutgoingButtonsMessage} message - The outgoing buttons message details.
-   * @param {string} recipient_id - The recipient's ID.
-   * @param {BlockOptions} [_options] - Optional configuration for message customization.
+   * @param message - The outgoing buttons message details.
+   * @param _options - Optional configuration for message customization.
    *
-   * @returns {Whatsapp.OutgoingMessageBase} The formatted interactive message object.
+   * @returns The formatted interactive message object.
    */
   _buttonsFormat(
     message: StdOutgoingButtonsMessage,
-    recipient_id: string,
     _options?: BlockOptions,
-  ): Whatsapp.OutgoingMessageBase {
+  ): WhatsApp.Messages.InteractiveMessage {
+    const buttons: WhatsApp.Messages.ReplyButton[] = message.buttons
+      .filter(({ type }) => type == ButtonType.postback)
+      .map((btn: PostBackButton) => ({
+        type: 'reply',
+        reply: {
+          id: btn.payload,
+          title: btn.title,
+        },
+      }));
     return {
       //note: URL button is not supported in whatsapp interactive message
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient_id,
       type: 'interactive',
       interactive: {
-        type: 'button',
+        type: WhatsApp.Messages.InteractiveType.Button,
         body: {
           text: message.text,
         },
         action: {
-          buttons: message.buttons.map((quickReply: any) => ({
-            type: 'reply',
-            reply: {
-              id: quickReply.payload,
-              title: quickReply.title,
-            },
-          })),
+          buttons,
         },
       },
     };
   }
 
   /**
-   * @function sendMessage
-   * @description Sends a message via the WhatsApp API to the recipient specified in the event.
+   * Sends a message via the WhatsApp API to the recipient specified in the event.
    * Formats the message based on the provided envelope and options, and returns the message ID of the sent message.
    *
-   * @param {WhatsappEventWrapper} event - The event wrapper containing details about the message sender and context.
-   * @param {StdOutgoingEnvelope} envelope - The envelope containing the outgoing message details.
-   * @param {BlockOptions} options - Options for message customization (e.g., templates, formatting).
-   * @param {any} [_context] - Optional additional context for the message (default: `undefined`).
+   * @param event - The event wrapper containing details about the message sender and context.
+   * @param envelope - The envelope containing the outgoing message details.
+   * @param options - Options for message customization (e.g., templates, formatting).
+   * @param _context - Optional additional context for the message (default: `undefined`).
    *
-   * @returns {Promise<{ mid: string }>} Resolves with an object containing the message ID (`mid`) of the sent message.
-   *
-   * @throws Will throw an error if:
-   * - The message formatting fails.
-   * - The API call to send the message fails.
+   * @returns Resolves with an object containing the message ID (`mid`) of the sent message.
    */
   async sendMessage(
-    event: WhatsappEventWrapper,
+    event: WhatsAppEventWrapper,
     envelope: StdOutgoingEnvelope,
     options: BlockOptions,
     _context?: any,
   ): Promise<{ mid: string }> {
-    const message = this._formatMessage(
-      envelope,
-      event.getSenderForeignId(),
-      options,
-    );
+    const message = this._formatMessage(envelope, options);
 
-    const phoneNumberId = event.getPhoneNumberId();
-    const res = await this.api.sendMessage(message, phoneNumberId);
-    return { mid: res.messages[0].id };
+    const channelData = event.getChannelData();
+    try {
+      const res = await this.api.sendMessage(
+        {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: event.getSenderForeignId(),
+          ...message,
+        },
+        channelData.metadata.phone_number_id,
+      );
+      return { mid: res.messages[0].id };
+    } catch (err) {
+      this.logger.error(err.response?.data);
+      throw err;
+    }
   }
 
-  async getUserData(event: WhatsappEventWrapper): Promise<SubscriberCreateDto> {
+  /**
+   * Retrieves user data based on a WhatsApp event.
+   *
+   * @param event - The WhatsApp event wrapper containing the event details.
+   *
+   * @returns A promise that resolves with the constructed `SubscriberCreateDto` object.
+   */
+  async getUserData(event: WhatsAppEventWrapper): Promise<SubscriberCreateDto> {
     const defautLanguage = await this.languageService.getDefaultLanguage();
-
-    const userName = event._adapter.raw.value.contacts[0].profile.name;
+    const channelData = event.getChannelData();
+    const userName = channelData.contact?.profile?.name;
     const [firstName, ...rest] = userName.split(' ');
-
     const lastName = rest.join(' ');
+
     return {
-      foreign_id: event._adapter.raw.value.contacts[0].wa_id,
+      foreign_id: event.getSenderForeignId(),
       first_name: firstName,
       last_name: lastName,
       gender: 'unknown',
-      channel: {
-        name: this.getName(),
-      },
+      channel: channelData,
       assignedAt: null,
       assignedTo: null,
       labels: [],
-      locale: null,
+      locale: 'en',
       language: defautLanguage.code,
       timezone: null,
       country: '',
       lastvisit: new Date(),
       retainedFrom: new Date(),
     };
+  }
+
+  async retrieveMedia(mediaId: string, phoneNumberId: string): Attachment {
+    const mediaMetadata = this.api.mediaAPI.getMediaUrl(mediaId, phoneNumberId);
+    const { data } = await this.httpService.axiosRef({
+      url: (await mediaMetadata).url,
+      method: 'GET',
+      responseType: 'arraybuffer',
+    });
+
+    await this.attachmentService.uploadFiles(data, foreignId + '.jpeg');
   }
 
   @OnEvent('hook:whatsapp_channel:access_token')

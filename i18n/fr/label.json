@@ -1,5 +1,5 @@
 {
-  "app_secret": "Clé Secrète Whatsapp",
+  "app_secret": "Clé Secrète WhatsApp",
   "access_token": "Jeton d’accès",
   "verify_token": "Jeton de Verification de l'URL",
   "get_started_button": "Activer le bouton `Démarrer`",

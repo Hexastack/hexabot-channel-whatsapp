@@ -87,6 +87,7 @@ Before getting started, ensure you have the following:
    - Click **"Generate Token"** to create a temporary token.
    - **Copy and store** the token securely. This token is required for your backend.
 
+Important : [Learn how to create a permanent token](https://developers.facebook.com/docs/whatsapp/business-management-api/get-started#1--acquire-an-access-token-using-a-system-user-or-facebook-login)
 ---
 
 ### Step 6: Set Up a Webhook
