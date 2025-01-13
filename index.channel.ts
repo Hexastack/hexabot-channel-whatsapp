@@ -7,6 +7,7 @@
  */
 
 import crypto from 'crypto';
+import { Stream } from 'stream';
 
 import { HttpService } from '@nestjs/axios';
 import { Injectable, RawBodyRequest } from '@nestjs/common';
@@ -610,14 +611,16 @@ export default class WhatsAppHandler extends ChannelHandler<
       media.id,
       phoneNumberId,
     );
-    const response = await this.httpService.axiosRef.get(mediaMetadata.url, {
-      responseType: 'arraybuffer',
-    });
-    const fileBuffer = Buffer.from(response.data);
+    const response = await this.httpService.axiosRef.get<Stream>(
+      mediaMetadata.url,
+      {
+        responseType: 'stream',
+      },
+    );
     // @TODO : perform sha256 check
-    return await this.attachmentService.store(fileBuffer, {
+    return await this.attachmentService.store(response.data, {
       name: media.filename || uuidv4(),
-      size: fileBuffer.length,
+      size: parseInt(response.headers['content-length']),
       type: media.mime_type || response.headers['content-type'],
       channel: {
         [this.getName()]: media,
