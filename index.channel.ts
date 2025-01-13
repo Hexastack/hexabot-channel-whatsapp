@@ -340,8 +340,7 @@ export default class WhatsAppHandler extends ChannelHandler<
     message: StdOutgoingAttachmentMessage,
     _options?: BlockOptions,
   ): Promise<WhatsApp.Messages.AnyMediaMessage> {
-    const attachment = message.attachment.payload;
-    const link = await this.getPublicUrl(attachment.id);
+    const link = await this.getPublicUrl(message.attachment.payload);
     const media: WhatsApp.Messages.Media = {
       link,
       // caption: attachment.name,
@@ -595,7 +594,15 @@ export default class WhatsAppHandler extends ChannelHandler<
     };
   }
 
-  public async retrieveMedia(
+  /**
+   * Fetches and stores a WhatsApp media as an attachment
+   *
+   * @param media WhatsApp Media object
+   * @param phoneNumberId Phone number business ID
+   *
+   * @returns Resolves once the media is stored as an attachment.
+   */
+  public async fetchAndStoreMedia(
     media: WhatsApp.Webhook.Media,
     phoneNumberId: string,
   ): Promise<Attachment> {

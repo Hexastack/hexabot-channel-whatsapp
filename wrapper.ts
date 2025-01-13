@@ -68,7 +68,8 @@ type WhatsAppEventAdapter =
 export default class WhatsAppEventWrapper extends EventWrapper<
   WhatsAppEventAdapter,
   WhatsApp.Event,
-  typeof WHATSAPP_CHANNEL_NAME
+  typeof WHATSAPP_CHANNEL_NAME,
+  WhatsAppHandler
 > {
   /**
    * Constructor : channel's event wrapper
@@ -121,18 +122,6 @@ export default class WhatsAppEventWrapper extends EventWrapper<
         case WhatsApp.Webhook.MessageType.Document:
         case WhatsApp.Webhook.MessageType.Sticker:
           this._adapter.messageType = IncomingMessageType.attachments;
-          const media =
-            event.type in event
-              ? (event[event.type] as WhatsApp.Webhook.Media)
-              : null;
-
-          if (!media) {
-            throw new Error('Unable to extract media object');
-          }
-
-          this._adapter.attachment = await (
-            this._handler as WhatsAppHandler
-          ).retrieveMedia(media, this.channelAttrs.metadata.phone_number_id);
           break;
         case WhatsApp.Webhook.MessageType.Button:
         case WhatsApp.Webhook.MessageType.Interactive:
@@ -147,6 +136,32 @@ export default class WhatsAppEventWrapper extends EventWrapper<
       }
     }
     this._adapter.raw = event;
+  }
+
+  /**
+   *
+   */
+  async preprocess(): Promise<void> {
+    if (
+      this._adapter.eventType === StdEventType.message &&
+      this._adapter.messageType === IncomingMessageType.attachments
+    ) {
+      const media =
+        this._adapter.raw.type in this._adapter.raw
+          ? (this._adapter.raw[
+              this._adapter.raw.type
+            ] as WhatsApp.Webhook.Media)
+          : null;
+
+      if (!media) {
+        throw new Error('Unable to extract media object');
+      }
+
+      this._adapter.attachment = await this._handler.fetchAndStoreMedia(
+        media,
+        this.channelAttrs.metadata.phone_number_id,
+      );
+    }
   }
 
   /**
