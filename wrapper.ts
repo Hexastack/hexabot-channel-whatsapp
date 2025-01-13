@@ -93,7 +93,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
    *
    * @param event - The message event received
    */
-  async _init(event: WhatsApp.Event) {
+  _init(event: WhatsApp.Event) {
     if ('status' in event) {
       switch (event.status) {
         case 'delivered':
