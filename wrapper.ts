@@ -139,32 +139,6 @@ export default class WhatsAppEventWrapper extends EventWrapper<
   }
 
   /**
-   * Fetches and storees received WhatsApp attachments
-   */
-  async preprocess(): Promise<void> {
-    if (
-      this._adapter.eventType === StdEventType.message &&
-      this._adapter.messageType === IncomingMessageType.attachments
-    ) {
-      const media =
-        this._adapter.raw.type in this._adapter.raw
-          ? (this._adapter.raw[
-              this._adapter.raw.type
-            ] as WhatsApp.Webhook.Media)
-          : null;
-
-      if (!media) {
-        throw new Error('Unable to extract media object');
-      }
-
-      this._adapter.attachment = await this._handler.fetchAndStoreMedia(
-        media,
-        this.channelAttrs.metadata.phone_number_id,
-      );
-    }
-  }
-
-  /**
    * Returns the message id
    *
    * @returns Message ID
