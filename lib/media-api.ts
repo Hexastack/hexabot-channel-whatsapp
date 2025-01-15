@@ -6,35 +6,38 @@
  * 2. All derivative works must include clear attribution to the original creator and software, Hexastack and Hexabot, in a prominent location (e.g., in the software's "About" section, documentation, and README file).
  */
 
+import { WhatsApp } from '../types';
+
 import { GraphApi } from './graph-api';
 
 export class MediaAPI {
-  constructor(private readonly graphRequest: GraphApi) {
-    this.graphRequest = graphRequest;
-  }
+  constructor(private readonly graphApi: GraphApi) {}
 
   //TODO: fix return typage
-  public async getMediaUrl(mediaId: string): Promise<string> {
+  public async getMediaUrl(
+    mediaId: string,
+    phoneNumberId: string,
+  ): Promise<WhatsApp.MediaMetadata> {
     debugger;
     if (!mediaId) {
       throw new Error('Media ID is required');
     }
-    const path = `/${mediaId}`;
+    const path = `/${mediaId}?phone_number_id=${phoneNumberId}`;
 
     try {
       // Send the GET request to retrieve media URL
-      const mediaData = await this.graphRequest.sendRequest({
+      return await this.graphApi.sendRequest<WhatsApp.MediaMetadata>({
         path,
         method: 'GET',
       });
 
-      if (mediaData && mediaData.url) {
-        // Extract and adjust the URL format (unescape it)
-        const formattedUrl = decodeURIComponent(mediaData.url); // Unescapes the URL
-        return formattedUrl;
-      } else {
-        throw new Error('URL not found in the response');
-      }
+      // if (mediaData && mediaData.url) {
+      //   // Extract and adjust the URL format (unescape it)
+      //   const formattedUrl = decodeURIComponent(mediaData.url); // Unescapes the URL
+      //   return formattedUrl;
+      // } else {
+      //   throw new Error('URL not found in the response');
+      // }
     } catch (error) {
       throw new Error('Failed to retrieve media URL');
     }
