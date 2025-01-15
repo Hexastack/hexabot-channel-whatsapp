@@ -8,7 +8,6 @@
 
 import { Attachment } from '@/attachment/schemas/attachment.schema';
 import EventWrapper from '@/channel/lib/EventWrapper';
-import { AttachmentPayload } from '@/chat/schemas/types/attachment';
 import {
   IncomingMessageType,
   PayloadType,
@@ -160,7 +159,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
           if ('interactive' in event) {
             return (
               event.interactive.button_reply?.id ||
-              event.interactive.list_reply.id
+              event.interactive.list_reply?.id
             );
           } else {
             return event.button.payload;
@@ -214,10 +213,11 @@ export default class WhatsAppEventWrapper extends EventWrapper<
         if ('interactive' in this._adapter.raw) {
           const interactive = this._adapter.raw.interactive;
           return {
-            postback:
-              interactive.button_reply?.id || interactive.list_reply?.id,
-            text:
-              interactive.button_reply?.title || interactive.list_reply?.title,
+            postback: (interactive.button_reply?.id ||
+              interactive.list_reply?.id ||
+              interactive.list_reply?.title) as string,
+            text: (interactive.button_reply?.title ||
+              interactive.list_reply?.title) as string,
           };
         } else {
           return {
@@ -258,15 +258,8 @@ export default class WhatsAppEventWrapper extends EventWrapper<
         };
       }
       default:
-        return undefined;
+        throw new Error('Unable to get message');
     }
-  }
-
-  /**
-   * @deprecated
-   */
-  getAttachments(): AttachmentPayload[] {
-    return [];
   }
 
   /**
@@ -278,7 +271,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
     if (this._adapter.eventType === StdEventType.message) {
       return this._adapter.raw.from;
     }
-    return undefined;
+    throw new Error('Unable to get the sender foreign ID');
   }
 
   /**
@@ -290,7 +283,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
     if ('recipient_id' in this._adapter.raw) {
       return this._adapter.raw.recipient_id;
     }
-    return undefined;
+    throw new Error('Unable to get the recipient foreign ID');
   }
 
   /**

@@ -214,7 +214,7 @@ export default class WhatsAppHandler extends ChannelHandler<
     const settings = await this.getSettings();
     const expectedHash = crypto
       .createHmac('sha1', settings.app_secret)
-      .update(req.rawBody)
+      .update(req.rawBody!)
       .digest('hex');
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
@@ -292,7 +292,7 @@ export default class WhatsAppHandler extends ChannelHandler<
           entry.changes.forEach((change) => {
             const messageEvents = (change.value.messages || []).map(
               (message) => {
-                const contact = change.value.contacts.find(
+                const contact = change.value.contacts?.find(
                   ({ wa_id }) => wa_id === message.from,
                 );
                 return new WhatsAppEventWrapper(handler, message, {
@@ -434,15 +434,16 @@ export default class WhatsAppHandler extends ChannelHandler<
     message: StdOutgoingListMessage,
     options: BlockOptions,
   ): WhatsApp.Messages.InteractiveMessage {
-    const fields = options.content.fields;
+    const fields = options.content?.fields;
     const rows: WhatsApp.Messages.Row[] = message.elements.map((item) => {
       const postback = Content.getPayload(item);
       return {
         id: postback,
-        title: item[fields.title],
-        description: item[fields.subtitle]
-          ? this.truncateText(item[fields.subtitle], 72)
-          : undefined, // Optional: Include if available
+        title: fields ? item[fields.title] : item.title,
+        description:
+          fields?.subtitle && item[fields.subtitle]
+            ? this.truncateText(item[fields.subtitle], 72)
+            : undefined, // Optional: Include if available
       };
     });
     const btnText = message.options.buttons[0].title;
@@ -622,7 +623,9 @@ export default class WhatsAppHandler extends ChannelHandler<
     const defautLanguage = await this.languageService.getDefaultLanguage();
     const channelData = event.getChannelData();
     const userName = channelData.contact?.profile?.name;
-    const [firstName, ...rest] = userName.split(' ');
+    const [firstName, ...rest] = userName
+      ? userName.split(' ')
+      : ['Anonymous', 'Subscriber'];
     const lastName = rest.join(' ');
 
     // @TODO: Check if there is a way to retrieve the avatar
@@ -638,7 +641,6 @@ export default class WhatsAppHandler extends ChannelHandler<
       labels: [],
       locale: 'en',
       language: defautLanguage.code,
-      timezone: null,
       country: '',
       lastvisit: new Date(),
       retainedFrom: new Date(),
