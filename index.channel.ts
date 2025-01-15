@@ -7,18 +7,20 @@
  */
 
 import crypto from 'crypto';
+import { Stream } from 'stream';
 
 import { HttpService } from '@nestjs/axios';
 import { Injectable, RawBodyRequest } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { NextFunction, Request, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 
 import { Attachment } from '@/attachment/schemas/attachment.schema';
 import { AttachmentService } from '@/attachment/services/attachment.service';
 import { ChannelService } from '@/channel/channel.service';
 import ChannelHandler from '@/channel/lib/Handler';
 import { SubscriberCreateDto } from '@/chat/dto/subscriber.dto';
-import { FileType, WithUrl } from '@/chat/schemas/types/attachment';
+import { FileType } from '@/chat/schemas/types/attachment';
 import { ButtonType, PostBackButton } from '@/chat/schemas/types/button';
 import {
   OutgoingMessageFormat,
@@ -305,10 +307,10 @@ export default class WhatsAppHandler extends ChannelHandler<
    *
    * @returns The formatted message.
    */
-  _formatMessage(
+  async _formatMessage(
     envelope: StdOutgoingEnvelope,
     options: BlockOptions,
-  ): WhatsApp.Messages.AnyMessage {
+  ): Promise<WhatsApp.Messages.AnyMessage> {
     switch (envelope.format) {
       case OutgoingMessageFormat.buttons:
         return this._buttonsFormat(envelope.message, options);
@@ -321,7 +323,7 @@ export default class WhatsAppHandler extends ChannelHandler<
       case OutgoingMessageFormat.text:
         return this._textFormat(envelope.message, options);
       case OutgoingMessageFormat.attachment:
-        return this._attachmentFormat(envelope.message, options);
+        return await this._attachmentFormat(envelope.message, options);
       default:
         throw new Error('Unknown message format');
     }
@@ -335,12 +337,11 @@ export default class WhatsAppHandler extends ChannelHandler<
    *
    * @returns The formatted attachment message object.
    */
-  _attachmentFormat(
-    message: StdOutgoingAttachmentMessage<WithUrl<Attachment>>,
+  async _attachmentFormat(
+    message: StdOutgoingAttachmentMessage,
     _options?: BlockOptions,
-  ): WhatsApp.Messages.AnyMediaMessage {
-    const attachment = message.attachment.payload;
-    const link = Attachment.getAttachmentUrl(attachment.id, attachment.name);
+  ): Promise<WhatsApp.Messages.AnyMediaMessage> {
+    const link = await this.getPublicUrl(message.attachment.payload);
     const media: WhatsApp.Messages.Media = {
       link,
       // caption: attachment.name,
@@ -540,7 +541,7 @@ export default class WhatsAppHandler extends ChannelHandler<
     options: BlockOptions,
     _context?: any,
   ): Promise<{ mid: string }> {
-    const message = this._formatMessage(envelope, options);
+    const message = await this._formatMessage(envelope, options);
 
     const channelData = event.getChannelData();
     try {
@@ -574,6 +575,8 @@ export default class WhatsAppHandler extends ChannelHandler<
     const [firstName, ...rest] = userName.split(' ');
     const lastName = rest.join(' ');
 
+    // @TODO: Check if there is a way to retrieve the avatar
+
     return {
       foreign_id: event.getSenderForeignId(),
       first_name: firstName,
@@ -592,15 +595,37 @@ export default class WhatsAppHandler extends ChannelHandler<
     };
   }
 
-  async retrieveMedia(mediaId: string, phoneNumberId: string): Attachment {
-    const mediaMetadata = this.api.mediaAPI.getMediaUrl(mediaId, phoneNumberId);
-    const { data } = await this.httpService.axiosRef({
-      url: (await mediaMetadata).url,
-      method: 'GET',
-      responseType: 'arraybuffer',
+  /**
+   * Fetches and stores a WhatsApp media as an attachment
+   *
+   * @param media WhatsApp Media object
+   * @param phoneNumberId Phone number business ID
+   *
+   * @returns Resolves once the media is stored as an attachment.
+   */
+  public async fetchAndStoreMedia(
+    media: WhatsApp.Webhook.Media,
+    phoneNumberId: string,
+  ): Promise<Attachment> {
+    const mediaMetadata = await this.api.mediaAPI.getMediaUrl(
+      media.id,
+      phoneNumberId,
+    );
+    const response = await this.httpService.axiosRef.get<Stream>(
+      mediaMetadata.url,
+      {
+        responseType: 'stream',
+      },
+    );
+    // @TODO : perform sha256 check
+    return await this.attachmentService.store(response.data, {
+      name: media.filename || uuidv4(),
+      size: parseInt(response.headers['content-length']),
+      type: media.mime_type || response.headers['content-type'],
+      channel: {
+        [this.getName()]: media,
+      },
     });
-
-    await this.attachmentService.uploadFiles(data, foreignId + '.jpeg');
   }
 
   @OnEvent('hook:whatsapp_channel:access_token')
