@@ -139,7 +139,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
   }
 
   /**
-   *
+   * Fetches and storees received WhatsApp attachments
    */
   async preprocess(): Promise<void> {
     if (
