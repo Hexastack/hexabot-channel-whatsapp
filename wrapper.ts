@@ -8,6 +8,7 @@
 
 import { Attachment } from '@/attachment/schemas/attachment.schema';
 import EventWrapper from '@/channel/lib/EventWrapper';
+import { FileType } from '@/chat/schemas/types/attachment';
 import {
   IncomingMessageType,
   PayloadType,
@@ -25,43 +26,43 @@ type WhatsAppEventAdapter =
       eventType: StdEventType.unknown;
       messageType: never;
       raw: WhatsApp.Event;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.delivery;
       messageType: never;
       raw: WhatsApp.Webhook.Status;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.read;
       messageType: never;
       raw: WhatsApp.Webhook.Status;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.message;
       raw: WhatsApp.Webhook.TextMessage;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.attachments;
       raw: WhatsApp.Webhook.MediaMessage;
-      attachment: Attachment;
+      attachments: Attachment[];
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.location;
       raw: WhatsApp.Webhook.LocationMessage;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.postback;
       raw: WhatsApp.Webhook.InteractiveMessage | WhatsApp.Webhook.ButtonMessage;
-      attachment: never;
+      attachments: never;
     };
 
 export default class WhatsAppEventWrapper extends EventWrapper<
@@ -177,11 +178,23 @@ export default class WhatsAppEventWrapper extends EventWrapper<
           };
         }
         case IncomingMessageType.attachments: {
-          if (!this._adapter.attachment) {
+          if (!this._adapter.attachments) {
             throw new Error('Unable to find attachment');
           }
 
-          const attachment = this._adapter.attachment;
+          if (this._adapter.attachments.length === 0) {
+            return {
+              type: PayloadType.attachments,
+              attachment: {
+                type: FileType.unknown,
+                payload: {
+                  id: null,
+                },
+              },
+            };
+          }
+
+          const attachment = this._adapter.attachments[0];
 
           return {
             type: PayloadType.attachments,
@@ -237,24 +250,26 @@ export default class WhatsAppEventWrapper extends EventWrapper<
         };
       }
       case IncomingMessageType.attachments: {
-        if (!this._adapter.attachment) {
+        if (!this._adapter.attachments) {
           throw new Error('Unable to find attachment');
         }
 
-        const attachment = this._adapter.attachment;
+        const attachment = this._adapter.attachments[0];
 
         const serialized = ['attachment'];
         const type = Attachment.getTypeByMime(attachment.type);
 
         serialized.concat([type, attachment.name]);
 
+        const payloads = this._adapter.attachments.map((attachment) => ({
+          type: Attachment.getTypeByMime(attachment.type),
+          payload: { id: attachment.id },
+        }));
+
         return {
           type: PayloadType.attachments,
           serialized_text: serialized.join(':'),
-          attachment: {
-            type,
-            payload: { id: attachment.id },
-          },
+          attachment: payloads.length > 1 ? payloads : payloads[0],
         };
       }
       default:
