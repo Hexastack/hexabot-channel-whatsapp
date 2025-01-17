@@ -13,16 +13,16 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, RawBodyRequest } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { NextFunction, Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 
-import { Attachment } from '@/attachment/schemas/attachment.schema';
 import { AttachmentService } from '@/attachment/services/attachment.service';
+import { AttachmentFile } from '@/attachment/types';
 import { ChannelService } from '@/channel/channel.service';
 import ChannelHandler from '@/channel/lib/Handler';
 import { SubscriberCreateDto } from '@/chat/dto/subscriber.dto';
 import { FileType } from '@/chat/schemas/types/attachment';
 import { ButtonType, PostBackButton } from '@/chat/schemas/types/button';
 import {
+  IncomingMessageType,
   OutgoingMessageFormat,
   StdEventType,
   StdOutgoingAttachmentMessage,
@@ -63,7 +63,7 @@ export default class WhatsAppHandler extends ChannelHandler<
     protected readonly i18n: I18nService,
     protected readonly languageService: LanguageService,
     protected readonly subscriberService: SubscriberService,
-    protected readonly attachmentService: AttachmentService,
+    public readonly attachmentService: AttachmentService,
     protected readonly messageService: MessageService,
     protected readonly menuService: MenuService,
     protected readonly labelService: LabelService,
@@ -87,6 +87,60 @@ export default class WhatsAppHandler extends ChannelHandler<
       this.httpService,
       settings ? settings.access_token : '',
     );
+  }
+
+  /**
+   * Fetches a WhatsApp media
+   *
+   * @param event The message event received
+   *
+   * @returns Resolves the retrieved media as an attachment file.
+   */
+  async getMessageAttachments(
+    event: WhatsAppEventWrapper,
+  ): Promise<AttachmentFile[]> {
+    if (
+      event._adapter.eventType === StdEventType.message &&
+      event._adapter.messageType === IncomingMessageType.attachments
+    ) {
+      const media =
+        event._adapter.raw.type in event._adapter.raw
+          ? (event._adapter.raw[
+              event._adapter.raw.type
+            ] as WhatsApp.Webhook.Media)
+          : null;
+
+      if (!media) {
+        return [];
+      }
+
+      const setttings = await this.getSettings();
+      const channelData = event.getChannelData();
+      const mediaMetadata = await this.api.mediaAPI.getMediaUrl(
+        media.id,
+        channelData.metadata.phone_number_id,
+      );
+      const response = await this.httpService.axiosRef.get<Stream>(
+        mediaMetadata.url,
+        {
+          responseType: 'stream',
+          headers: {
+            Authorization: `Bearer ${setttings.access_token}`,
+          },
+        },
+      );
+      // @TODO : perform sha256 check
+      return [
+        {
+          file: response.data,
+          size: mediaMetadata.file_size
+            ? parseInt(mediaMetadata.file_size)
+            : parseInt(response.headers['content-length']),
+          type: mediaMetadata.mime_type || response.headers['content-type'],
+        },
+      ];
+    }
+    return [];
   }
 
   /**
@@ -166,7 +220,7 @@ export default class WhatsAppHandler extends ChannelHandler<
     const settings = await this.getSettings();
     const expectedHash = crypto
       .createHmac('sha1', settings.app_secret)
-      .update(req.rawBody)
+      .update(req.rawBody!)
       .digest('hex');
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
@@ -244,7 +298,7 @@ export default class WhatsAppHandler extends ChannelHandler<
           entry.changes.forEach((change) => {
             const messageEvents = (change.value.messages || []).map(
               (message) => {
-                const contact = change.value.contacts.find(
+                const contact = change.value.contacts?.find(
                   ({ wa_id }) => wa_id === message.from,
                 );
                 return new WhatsAppEventWrapper(handler, message, {
@@ -386,15 +440,16 @@ export default class WhatsAppHandler extends ChannelHandler<
     message: StdOutgoingListMessage,
     options: BlockOptions,
   ): WhatsApp.Messages.InteractiveMessage {
-    const fields = options.content.fields;
+    const fields = options.content?.fields;
     const rows: WhatsApp.Messages.Row[] = message.elements.map((item) => {
       const postback = Content.getPayload(item);
       return {
         id: postback,
-        title: item[fields.title],
-        description: item[fields.subtitle]
-          ? this.truncateText(item[fields.subtitle], 72)
-          : undefined, // Optional: Include if available
+        title: fields ? item[fields.title] : item.title,
+        description:
+          fields?.subtitle && item[fields.subtitle]
+            ? this.truncateText(item[fields.subtitle], 72)
+            : undefined, // Optional: Include if available
       };
     });
     const btnText = message.options.buttons[0].title;
@@ -568,11 +623,15 @@ export default class WhatsAppHandler extends ChannelHandler<
    *
    * @returns A promise that resolves with the constructed `SubscriberCreateDto` object.
    */
-  async getUserData(event: WhatsAppEventWrapper): Promise<SubscriberCreateDto> {
+  async getSubscriberData(
+    event: WhatsAppEventWrapper,
+  ): Promise<SubscriberCreateDto> {
     const defautLanguage = await this.languageService.getDefaultLanguage();
     const channelData = event.getChannelData();
     const userName = channelData.contact?.profile?.name;
-    const [firstName, ...rest] = userName.split(' ');
+    const [firstName, ...rest] = userName
+      ? userName.split(' ')
+      : ['Anonymous', 'Subscriber'];
     const lastName = rest.join(' ');
 
     // @TODO: Check if there is a way to retrieve the avatar
@@ -588,44 +647,10 @@ export default class WhatsAppHandler extends ChannelHandler<
       labels: [],
       locale: 'en',
       language: defautLanguage.code,
-      timezone: null,
       country: '',
       lastvisit: new Date(),
       retainedFrom: new Date(),
     };
-  }
-
-  /**
-   * Fetches and stores a WhatsApp media as an attachment
-   *
-   * @param media WhatsApp Media object
-   * @param phoneNumberId Phone number business ID
-   *
-   * @returns Resolves once the media is stored as an attachment.
-   */
-  public async fetchAndStoreMedia(
-    media: WhatsApp.Webhook.Media,
-    phoneNumberId: string,
-  ): Promise<Attachment> {
-    const mediaMetadata = await this.api.mediaAPI.getMediaUrl(
-      media.id,
-      phoneNumberId,
-    );
-    const response = await this.httpService.axiosRef.get<Stream>(
-      mediaMetadata.url,
-      {
-        responseType: 'stream',
-      },
-    );
-    // @TODO : perform sha256 check
-    return await this.attachmentService.store(response.data, {
-      name: media.filename || uuidv4(),
-      size: parseInt(response.headers['content-length']),
-      type: media.mime_type || response.headers['content-type'],
-      channel: {
-        [this.getName()]: media,
-      },
-    });
   }
 
   @OnEvent('hook:whatsapp_channel:access_token')

@@ -8,7 +8,7 @@
 
 import { Attachment } from '@/attachment/schemas/attachment.schema';
 import EventWrapper from '@/channel/lib/EventWrapper';
-import { AttachmentPayload } from '@/chat/schemas/types/attachment';
+import { FileType } from '@/chat/schemas/types/attachment';
 import {
   IncomingMessageType,
   PayloadType,
@@ -26,43 +26,43 @@ type WhatsAppEventAdapter =
       eventType: StdEventType.unknown;
       messageType: never;
       raw: WhatsApp.Event;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.delivery;
       messageType: never;
       raw: WhatsApp.Webhook.Status;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.read;
       messageType: never;
       raw: WhatsApp.Webhook.Status;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.message;
       raw: WhatsApp.Webhook.TextMessage;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.attachments;
       raw: WhatsApp.Webhook.MediaMessage;
-      attachment: Attachment;
+      attachments: Attachment[];
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.location;
       raw: WhatsApp.Webhook.LocationMessage;
-      attachment: never;
+      attachments: never;
     }
   | {
       eventType: StdEventType.message;
       messageType: IncomingMessageType.postback;
       raw: WhatsApp.Webhook.InteractiveMessage | WhatsApp.Webhook.ButtonMessage;
-      attachment: never;
+      attachments: never;
     };
 
 export default class WhatsAppEventWrapper extends EventWrapper<
@@ -139,32 +139,6 @@ export default class WhatsAppEventWrapper extends EventWrapper<
   }
 
   /**
-   * Fetches and storees received WhatsApp attachments
-   */
-  async preprocess(): Promise<void> {
-    if (
-      this._adapter.eventType === StdEventType.message &&
-      this._adapter.messageType === IncomingMessageType.attachments
-    ) {
-      const media =
-        this._adapter.raw.type in this._adapter.raw
-          ? (this._adapter.raw[
-              this._adapter.raw.type
-            ] as WhatsApp.Webhook.Media)
-          : null;
-
-      if (!media) {
-        throw new Error('Unable to extract media object');
-      }
-
-      this._adapter.attachment = await this._handler.fetchAndStoreMedia(
-        media,
-        this.channelAttrs.metadata.phone_number_id,
-      );
-    }
-  }
-
-  /**
    * Returns the message id
    *
    * @returns Message ID
@@ -186,7 +160,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
           if ('interactive' in event) {
             return (
               event.interactive.button_reply?.id ||
-              event.interactive.list_reply.id
+              event.interactive.list_reply?.id
             );
           } else {
             return event.button.payload;
@@ -204,15 +178,27 @@ export default class WhatsAppEventWrapper extends EventWrapper<
           };
         }
         case IncomingMessageType.attachments: {
-          if (!this._adapter.attachment) {
+          if (!this._adapter.attachments) {
             throw new Error('Unable to find attachment');
           }
 
-          const attachment = this._adapter.attachment;
+          if (this._adapter.attachments.length === 0) {
+            return {
+              type: PayloadType.attachments,
+              attachment: {
+                type: FileType.unknown,
+                payload: {
+                  id: null,
+                },
+              },
+            };
+          }
+
+          const attachment = this._adapter.attachments[0];
 
           return {
             type: PayloadType.attachments,
-            attachments: {
+            attachment: {
               type: Attachment.getTypeByMime(attachment.type),
               payload: {
                 id: attachment.id,
@@ -240,10 +226,11 @@ export default class WhatsAppEventWrapper extends EventWrapper<
         if ('interactive' in this._adapter.raw) {
           const interactive = this._adapter.raw.interactive;
           return {
-            postback:
-              interactive.button_reply?.id || interactive.list_reply?.id,
-            text:
-              interactive.button_reply?.title || interactive.list_reply?.title,
+            postback: (interactive.button_reply?.id ||
+              interactive.list_reply?.id ||
+              interactive.list_reply?.title) as string,
+            text: (interactive.button_reply?.title ||
+              interactive.list_reply?.title) as string,
           };
         } else {
           return {
@@ -263,36 +250,31 @@ export default class WhatsAppEventWrapper extends EventWrapper<
         };
       }
       case IncomingMessageType.attachments: {
-        if (!this._adapter.attachment) {
+        if (!this._adapter.attachments) {
           throw new Error('Unable to find attachment');
         }
 
-        const attachment = this._adapter.attachment;
+        const attachment = this._adapter.attachments[0];
 
         const serialized = ['attachment'];
         const type = Attachment.getTypeByMime(attachment.type);
 
         serialized.concat([type, attachment.name]);
 
+        const payloads = this._adapter.attachments.map((attachment) => ({
+          type: Attachment.getTypeByMime(attachment.type),
+          payload: { id: attachment.id },
+        }));
+
         return {
           type: PayloadType.attachments,
           serialized_text: serialized.join(':'),
-          attachment: {
-            type,
-            payload: { id: attachment.id },
-          },
+          attachment: payloads.length > 1 ? payloads : payloads[0],
         };
       }
       default:
-        return undefined;
+        throw new Error('Unable to get message');
     }
-  }
-
-  /**
-   * @deprecated
-   */
-  getAttachments(): AttachmentPayload[] {
-    return [];
   }
 
   /**
@@ -304,7 +286,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
     if (this._adapter.eventType === StdEventType.message) {
       return this._adapter.raw.from;
     }
-    return undefined;
+    throw new Error('Unable to get the sender foreign ID');
   }
 
   /**
@@ -316,7 +298,7 @@ export default class WhatsAppEventWrapper extends EventWrapper<
     if ('recipient_id' in this._adapter.raw) {
       return this._adapter.raw.recipient_id;
     }
-    return undefined;
+    throw new Error('Unable to get the recipient foreign ID');
   }
 
   /**

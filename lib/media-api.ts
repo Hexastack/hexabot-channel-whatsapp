@@ -18,7 +18,6 @@ export class MediaAPI {
     mediaId: string,
     phoneNumberId: string,
   ): Promise<WhatsApp.MediaMetadata> {
-    debugger;
     if (!mediaId) {
       throw new Error('Media ID is required');
     }
