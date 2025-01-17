@@ -114,6 +114,7 @@ export default class WhatsAppHandler extends ChannelHandler<
         return [];
       }
 
+      const setttings = await this.getSettings();
       const channelData = event.getChannelData();
       const mediaMetadata = await this.api.mediaAPI.getMediaUrl(
         media.id,
@@ -123,13 +124,18 @@ export default class WhatsAppHandler extends ChannelHandler<
         mediaMetadata.url,
         {
           responseType: 'stream',
+          headers: {
+            Authorization: `Bearer ${setttings.access_token}`,
+          },
         },
       );
       // @TODO : perform sha256 check
       return [
         {
           file: response.data,
-          size: parseInt(response.headers['content-length']),
+          size: mediaMetadata.file_size
+            ? parseInt(mediaMetadata.file_size)
+            : parseInt(response.headers['content-length']),
           type: mediaMetadata.mime_type || response.headers['content-type'],
         },
       ];
