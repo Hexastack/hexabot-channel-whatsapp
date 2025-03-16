@@ -96,7 +96,8 @@ Webhooks enable real-time updates from WhatsApp to your chatbot.
 
 1. **Provide a Webhook URL**:
    - In **WhatsApp > Configuration**, enter your server's webhook URL.
-     - Example: `https://your-domain.com/webhook/whatsapp`.
+     - Example: `https://your-domain.com/webhook/whatsapp` or if running in production behind NGNIX using method 1 'https://your-domain.com/api/webhook/whatsapp'
+  
 2. **Set a Verification Token**:
    - Create a secure token to verify the webhook.
 3. **Choose Subscription Fields**:
