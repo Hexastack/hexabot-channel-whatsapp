@@ -632,7 +632,7 @@ export default class WhatsAppHandler extends ChannelHandler<
     const [firstName, ...rest] = userName
       ? userName.split(' ')
       : ['Anonymous', 'Subscriber'];
-    const lastName = rest.join(' ');
+    const lastName = rest.length > 0 ? rest.join(' ') : firstName;
 
     // @TODO: Check if there is a way to retrieve the avatar
 
