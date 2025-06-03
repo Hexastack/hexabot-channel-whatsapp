@@ -17,7 +17,7 @@ export default [
   {
     group: WHATSAPP_GROUP_NAME,
     label: 'app_secret',
-    value: '' as string,
+    value: '',
     type: SettingType.secret,
   },
   {

@@ -9,13 +9,14 @@
 import { Attachment } from '@/attachment/schemas/attachment.schema';
 import EventWrapper from '@/channel/lib/EventWrapper';
 import { FileType } from '@/chat/schemas/types/attachment';
+import { PayloadType } from '@/chat/schemas/types/button';
 import {
   IncomingMessageType,
   StdEventType,
   StdIncomingMessage,
 } from '@/chat/schemas/types/message';
 import { Payload } from '@/chat/schemas/types/quick-reply';
-import { PayloadType } from '@/chat/schemas/types/button';
+
 import WhatsAppHandler from './index.channel';
 import { WHATSAPP_CHANNEL_NAME } from './settings';
 import { WhatsApp } from './types';
