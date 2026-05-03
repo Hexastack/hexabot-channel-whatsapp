@@ -1,0 +1,22 @@
+{
+  "whatsapp": {
+    "WhatsApp Channel": "WhatsApp Channel",
+    "App secret credential": "App secret credential",
+    "Credential containing the Meta app secret used to verify webhook signatures.": "Credential containing the Meta app secret used to verify webhook signatures.",
+    "Access token credential": "Access token credential",
+    "Credential containing the WhatsApp Cloud API access token.": "Credential containing the WhatsApp Cloud API access token.",
+    "Verify token credential": "Verify token credential",
+    "Credential containing the token Meta sends during webhook verification.": "Credential containing the token Meta sends during webhook verification.",
+    "WhatsApp Business Account ID": "WhatsApp Business Account ID",
+    "Optional WABA ID. When set, webhook entries for other business accounts are ignored.": "Optional WABA ID. When set, webhook entries for other business accounts are ignored.",
+    "Phone number ID": "Phone number ID",
+    "Optional WhatsApp Business phone number ID. When set, webhook changes for other phone numbers are ignored.": "Optional WhatsApp Business phone number ID. When set, webhook changes for other phone numbers are ignored.",
+    "Graph API version": "Graph API version",
+    "Graph API version used for WhatsApp Cloud API requests.": "Graph API version used for WhatsApp Cloud API requests.",
+    "Thread inactivity (hours)": "Thread inactivity (hours)",
+    "Automatically start a new thread when the last message is older than this threshold.": "Automatically start a new thread when the last message is older than this threshold."
+  },
+  "View More": "View More",
+  "Options": "Options",
+  "Select an option": "Select an option"
+}

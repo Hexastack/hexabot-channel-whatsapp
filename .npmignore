@@ -1,1 +1,11 @@
 .github
+.git
+.turbo
+coverage
+node_modules
+src/**/*.spec.ts
+tsconfig.eslint.json
+eslint.config.cjs
+eslint.config-staged.cjs
+jest.config.ts
+

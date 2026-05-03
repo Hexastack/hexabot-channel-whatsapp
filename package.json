@@ -1,12 +1,82 @@
 {
   "name": "hexabot-channel-whatsapp",
-  "version": "2.2.3",
-  "description": "WhatsApp Channel Extension for Hexabot Chatbot Builder",
-  "scripts": {
-    "release:patch": "npm version patch && git push origin main --tags",
-    "release:minor": "npm version minor && git push origin main --tags"
-  },
-  "peerDependencies": {},
+  "version": "3.0.0",
+  "description": "WhatsApp Cloud API channel extension for Hexabot v3.",
   "author": "Hexastack",
-  "license": "AGPL-3.0-only"
+  "license": "FCL-1.0-ALv2",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js"
+    },
+    "./index.channel": {
+      "types": "./dist/index.channel.d.ts",
+      "require": "./dist/index.channel.js",
+      "import": "./dist/index.channel.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "i18n",
+    "README.md",
+    "LICENSE.md",
+    "!src/**/*.spec.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:publish": "npm run clean && npm run build && npm run check:dist",
+    "check:dist": "test -f dist/index.js && test -f dist/index.channel.js",
+    "clean": "rimraf dist coverage",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "lint": "eslint \"src/**/*.ts\" \"jest.config.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"jest.config.ts\" --fix",
+    "prepublishOnly": "npm run build:publish",
+    "release:patch": "npm version patch && git push origin main --tags",
+    "release:minor": "npm version minor && git push origin main --tags",
+    "test": "jest --config jest.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@hexabot-ai/api": ">=3.2.2-alpha.0 <4",
+    "@hexabot-ai/types": ">=3.0.2-alpha.0 <4",
+    "@nestjs/axios": "^4.0.1",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "rxjs": "^7.8.2",
+    "zod": ">=4.3.6 <5"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@hexabot-ai/api": ">=3.2.2-alpha.0 <4",
+    "@hexabot-ai/types": ">=3.0.2-alpha.0 <4",
+    "@nestjs/axios": "^4.0.1",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@types/express": "^5.0.3",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.3.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.0",
+    "@typescript-eslint/parser": "^8.46.0",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-header": "^3.1.1",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^15.15.0",
+    "jest": "^30.2.0",
+    "prettier": "^3.6.2",
+    "rimraf": "^6.0.1",
+    "rxjs": "^7.8.2",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.8.3",
+    "zod": "4.3.6"
+  },
+  "engines": {
+    "node": "^20.19.0"
+  },
+  "packageManager": "pnpm@9.12.3+sha512.cce0f9de9c5a7c95bef944169cc5dfe8741abfb145078c0d508b868056848a87c81e626246cb60967cbd7fd29a6c062ef73ff840d96b3c86c40ac92cf4a813ee"
 }
