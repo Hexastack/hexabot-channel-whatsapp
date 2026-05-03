@@ -1,173 +1,228 @@
 # Hexabot WhatsApp Channel Extension
 
-The **WhatsApp Channel Extension** for Hexabot enables seamless integration of your Hexabot chatbot with WhatsApp-related business assets, such as WhatsApp Business Accounts and message templates.
+`hexabot-channel-whatsapp` adds official Meta WhatsApp Cloud API support to Hexabot v3. It is a first-class v3 channel extension discovered by `@hexabot-ai/api` and registered with the channel name `whatsapp`.
 
-[Hexabot](https://hexabot.ai/) is an open-source chatbot/agent solution that allows users to create and manage AI-powered, multi-channel, and multilingual chatbots with ease. Learn more about Hexabot on the [official GitHub repository](https://github.com/Hexastack/Hexabot).
-
----
+[Hexabot](https://hexabot.ai/) is an open-source chatbot and agent builder for multi-channel, multilingual conversational automation. Learn more in the [Hexabot repository](https://github.com/Hexastack/Hexabot).
 
 ## Features
 
-- **Media Messages**: Send files, images, and locations.
-- **Interactive Messages**: Simplify responses with:
-  - **Quick Replies**: Offer predefined response options for faster interactions.
-  - **Attachments**: Enrich conversations with media (images, videos, files, etc.).
-  - **List Messages**: Present users with selectable options for structured responses.
+- Secure Meta webhook verification with `hub.challenge` support.
+- Request signature verification with `x-hub-signature-256` and SHA-1 fallback.
+- Inbound text, contacts, interactive replies, button replies, list replies, locations, media, delivery/read statuses, and failed-status events.
+- Outbound text, reply buttons, CTA URL buttons, media by public URL, lists, and carousel-as-list messages.
+- Media metadata lookup and authenticated media download through the WhatsApp Cloud API.
+- Typing indicator support through WhatsApp read receipts with `typing_indicator`.
+- Optional filtering by WhatsApp Business Account ID and phone number ID.
+- v3 thread rollover support through `thread_inactivity_hours`.
 
----
+## Installation
+
+Install the package in the same workspace or deployment that runs `@hexabot-ai/api`:
+
+```sh
+npm add hexabot-channel-whatsapp
+```
+
+Restart the Hexabot API after installation. The channel appears with the name `whatsapp`.
+
+For local development inside this package:
+
+```sh
+npm install
+npm test
+npm run typecheck
+npm run build
+```
 
 ## Prerequisites
 
-Before getting started, ensure you have the following:
+Before configuring the channel, make sure you have:
 
-- A **Facebook account**.
-- A **Meta Developer Account**: [Register here](https://developers.facebook.com/docs/development/register).
-- An **App**: [Create one here](https://developers.facebook.com/docs/development/create-an-app).
-- Basic knowledge of **APIs** and **web development** (optional but helpful).
-- A **server** to host your chatbot (local servers can use [ngrok](https://ngrok.com/) or similar API gateways for testing).
-- **HTTPS** enabled on your server (required for webhooks).
-- A new or existing [Hexabot project](https://docs.hexabot.ai/quickstart/installation).
+- a Facebook account with access to [Meta for Developers](https://developers.facebook.com/);
+- a Meta developer app with the WhatsApp product enabled;
+- a WhatsApp Business Account connected to the app;
+- a WhatsApp Business phone number, or the Meta test phone number during development;
+- a Cloud API access token with the required WhatsApp messaging permissions;
+- your Meta app secret from **App Settings > Basic**;
+- a public HTTPS URL for the Hexabot API. For local testing, expose the API with a tunnel such as ngrok;
+- a Hexabot project running v3 with this extension installed;
+- Hexabot credentials created for the app secret, access token, and webhook verify token.
 
----
+This extension targets the official Meta WhatsApp Cloud API. It does not use WhatsApp Web, Baileys, WAHA, Evolution API, or another provider.
 
-## Setup Guide
+## Meta App Setup
 
-### Step 1: Create a Meta Developer Account
+### 1. Create or Select a Meta App
 
-1. **Access Meta for Developers**:
-   - Visit [Meta for Developers](https://developers.facebook.com/).
-2. **Log In**:
-   - Click **"Get Started"** and log in using your Facebook credentials.
-3. **Register as a Developer**:
-   - Accept the **Meta Platform Policies**.
-   - Complete any additional verification steps, such as phone verification.
-4. **Access the Developer Dashboard**:
-   - After registering, you’ll be redirected to the **Developer Dashboard**, where you can manage your apps.
+1. Open [Meta for Developers](https://developers.facebook.com/) and sign in.
+2. Complete developer registration if Meta asks for it.
+3. From **My Apps**, create a new app or open an existing app.
+4. For a new app, choose an app type that supports WhatsApp, usually **Business**.
+5. Open **App Settings > Basic** and copy the **App Secret**. Store it as a Hexabot credential.
 
----
+### 2. Add the WhatsApp Product
 
-### Step 2: Create an APP
+1. In the Meta app dashboard, add the **WhatsApp** product.
+2. Connect or create a Meta Business Account when prompted.
+3. Open **WhatsApp > API Setup**.
+4. Note the **WhatsApp Business Account ID** and **Phone Number ID**. These are optional in Hexabot, but strongly recommended when one app owns multiple assets.
 
-    - Navigate to your app list on the **Apps** screen.
-    - **Create a new app**.
-    - Choose a **name** for your new app.
-    - Choose **Other** for your app use case
-    - Choose **Business** as type for your app.
-    - Submit your request and now you'll see your newly created app in your list of applications.
+### 3. Add or Select a Phone Number
 
----
+For development, Meta provides a test phone number. For production, connect and verify a real WhatsApp Business phone number.
 
-### Step 3: Add the WhatsApp Product to Your App
+1. In **WhatsApp > API Setup**, open the phone number controls.
+2. Add a recipient number for test messages if you are using the test phone.
+3. Send a test message from Meta to confirm that the number is working.
+4. Keep the **Phone Number ID** available for the Hexabot source settings.
 
-1. **Add WhatsApp to Your App**:
-   - If creating a new app, select **"Add products to your app"**.
-   - For existing apps, navigate to your app on the **My Apps** screen.
-2. **Attach a Meta Business Account (MBA)**:
-   - You’ll be prompted to attach an MBA. If you don’t have one, follow the prompts to create it.
+### 4. Create an Access Token
 
----
+For development, the temporary token in **WhatsApp > API Setup** is enough to test the channel. For production, create a permanent token through a Meta system user or another approved Meta access-token flow.
 
-### Step 4: Add a Recipient Number
+The token must be able to send WhatsApp messages and retrieve media for the configured phone number. Store the token as a Hexabot credential and reference that credential in the source `access_token` setting.
 
-1. **Navigate to WhatsApp API Setup**:
-   - In the App Dashboard, go to **WhatsApp > API Setup**.
-2. **Add a Phone Number**:
-   - Under **Send and Receive Messages**, click **Manage Phone Number List** and add a valid WhatsApp number.
-3. **Send a test message**:
-   - Under **Step2: send messages with API**, click **Send a message** and then your'll receive a message on your WhatsApp number.
-   - You will need to accept/allow messages from the test number.
+### 5. Create a Verify Token
 
----
+Choose a secure random string. Store it as a Hexabot credential and use the same value in Meta when configuring the webhook.
 
-### Step 5: Generate an Access Token
+The verify token is not sent as a request signature. It is only used during Meta's GET webhook challenge.
 
-1. **Select Your App**:
-   - In the App Dashboard, go to **WhatsApp > API Setup**.
-2. **Generate Token**:
-   - Click **"Generate Token"** to create a temporary token.
-   - **Copy and store** the token securely. This token is required for your backend.
+## Hexabot Source Configuration
 
-Important : [Learn how to create a permanent token](https://developers.facebook.com/docs/whatsapp/business-management-api/get-started#1--acquire-an-access-token-using-a-system-user-or-facebook-login)
----
+Create one Hexabot source for each WhatsApp Business phone number you want to connect.
 
-### Step 6: Set Up a Webhook
+Required settings:
 
-Webhooks enable real-time updates from WhatsApp to your chatbot.
+- `app_secret`: credential containing the Meta app secret used to verify webhook signatures.
+- `access_token`: credential containing the WhatsApp Cloud API access token.
+- `verify_token`: credential containing the webhook verification token configured in Meta.
 
-1. **Provide a Webhook URL**:
-   - In **WhatsApp > Configuration**, enter your server's webhook URL.
-     - Example: `https://your-domain.com/webhook/whatsapp` or if running in production behind NGNIX using method 1 'https://your-domain.com/api/webhook/whatsapp'
-  
-2. **Set a Verification Token**:
-   - Create a secure token to verify the webhook.
-3. **Choose Subscription Fields**:
-   - Select events to subscribe to, such as **messages**.
-4. **Verify and Save**:
-   - Meta will send a verification request to your callback URL. Ensure your server responds correctly to complete the setup.
+Optional settings:
 
----
+- `business_account_id`: WhatsApp Business Account ID. When set, webhook entries for other WABAs are ignored.
+- `phone_number_id`: WhatsApp Business phone number ID. When set, webhook events for other phone numbers are ignored and outbound messages can fall back to this value.
+- `graph_api_version`: Meta Graph API version used for Cloud API requests. Defaults to `v25.0`.
+- `thread_inactivity_hours`: controls Hexabot v3 thread rollover. Defaults to `24`.
 
-## Configuration
+Save the source before verifying the webhook in Meta.
 
-To configure the WhatsApp Channel Extension, you’ll need the following:
+## Webhook Configuration
 
-### 1. Webhook Verification Token
+Use the WhatsApp source webhook endpoint in Meta:
 
-- **Description**: A secure token used by WhatsApp to verify your webhook.
-- **Setup**:
-  - Generate a token and configure it in both Hexabot and WhatsApp settings.
+```txt
+https://<your-domain>/api/webhook/<sourceRef>
+```
 
-### 2. WhatsApp Access Token
+If your production deployment proxies `/api` differently, use the public URL that reaches the Hexabot API webhook route.
 
-- **Description**: Grants your app access to the WhatsApp Business API.
-- **Setup**:
-  - In the Developer Dashboard, go to **WhatsApp > Configuration**.
-  - Generate the token and add it to your Hexabot configuration.
+In the Meta app dashboard:
 
-### 3. Facebook App Secret
+1. Open **WhatsApp > Configuration**.
+2. Set the **Callback URL** to the source webhook endpoint.
+3. Set the **Verify Token** to the value stored in the source `verify_token` credential.
+4. Click **Verify and Save**.
+5. Subscribe to the `messages` webhook field.
 
-- **Description**: A secret key for securing communication between WhatsApp and your chatbot.
-- **Setup**:
-  - Navigate to **App Settings > Basic** in the Developer Dashboard to retrieve the **App Secret**.
-  - Store this value securely.
+After saving, send a WhatsApp message to the connected phone number and confirm that a subscriber and message appear in Hexabot.
 
----
+## Supported Messages
 
-## Usage
+Inbound support:
 
-Once the extension is installed and configured, your Hexabot chatbot will be available on WhatsApp. Users can interact with your bot, leveraging features such as:
+- text messages become Hexabot text events;
+- contact cards are serialized into a text event;
+- WhatsApp button replies, interactive button replies, and list replies become postback events;
+- locations become location events;
+- image, audio, video, document, and sticker messages become attachment events;
+- delivered statuses become delivery events;
+- read statuses become read events;
+- failed statuses become error events;
+- sent, deleted, unsupported, and unknown channel-only events are ignored.
 
-- Media messages
-- Quick replies
-- Interactive lists
+Outbound support:
 
----
+- text messages are sent as WhatsApp text messages;
+- quick replies and postback buttons are sent as WhatsApp interactive reply buttons;
+- WhatsApp reply buttons are capped at 3 buttons;
+- one URL button is sent as an interactive CTA URL message;
+- mixed URL and postback buttons, or multiple URL buttons in one message, are rejected because WhatsApp Cloud API does not support that shape;
+- lists and carousels are sent as WhatsApp interactive lists with up to 10 rows;
+- oversized list/carousel messages reserve the final row for a `VIEW_MORE` pagination postback;
+- attachment messages are sent as image, audio, video, or document messages by public URL.
 
-## Note
+Attachment quick replies are intentionally rejected in this first v3 release because WhatsApp does not support combining media messages with reply buttons in the same way Messenger does.
 
-Currently, WhatsApp does not support URL buttons natively. As a workaround, we handle scenarios with a single URL button by leveraging WhatsApp's "Call to Action" (CTA) component.
+## Typing Indicators
 
-For cases requiring multiple URL buttons, you can create a specific flow tailored to the WhatsApp channel. This flow involves sending successive messages, each containing a single URL button attached as a CTA. By structuring your flow this way, you ensure that all URL buttons are presented effectively while adhering to WhatsApp's limitations.
+When a Hexabot outgoing envelope uses `options.typing`, the channel sends a WhatsApp read receipt for the inbound message with:
 
----
+```json
+{
+  "status": "read",
+  "typing_indicator": {
+    "type": "text"
+  }
+}
+```
+
+The handler waits for the requested delay, capped at 25 seconds, then sends the response.
+
+## Media Handling
+
+Inbound media events carry WhatsApp media IDs. When Hexabot downloads the attachment, the channel:
+
+1. retrieves media metadata from the Graph API;
+2. downloads the media URL with Bearer authentication;
+3. maps the response stream and headers into Hexabot's attachment file shape.
+
+Outbound media must use a public URL reachable by Meta. Private Hexabot file URLs or localhost URLs will not work unless your deployment exposes them publicly over HTTPS.
+
+## Limitations
+
+- Approved WhatsApp template messages are not implemented in this first v3 release. Standard Hexabot outgoing messages cover inbound-triggered session conversations.
+- Multiple URL buttons in one message are not supported by WhatsApp Cloud API. Create channel-specific flows that send separate CTA URL messages if you need several links.
+- WhatsApp persistent menus, greeting text, and Get Started behavior are Messenger concepts and are not part of this channel.
+- The channel relies on raw request bodies for webhook signature verification. Ensure the Hexabot API keeps `req.rawBody` available for webhook routes.
+
+## Development
+
+Common commands:
+
+```sh
+npm test
+npm run typecheck
+npm run build
+npm run build:publish
+npm pack --dry-run
+```
+
+`build:publish` removes generated output, builds `dist`, and verifies that the package export files exist.
+
+## Publishing
+
+The package keeps the v2 release workflow commands:
+
+```sh
+npm run release:patch
+npm run release:minor
+```
+
+Both commands create an npm version commit and tag, then push `main` with tags. The GitHub Actions release workflow builds and publishes the package to npm when the package version is not already published.
+
+Required repository secret:
+
+- `NPM_TOKEN`: npm automation token with publish access for `hexabot-channel-whatsapp`.
 
 ## Contributing
 
-We welcome contributions from the community! Whether you want to report a bug, suggest new features, or submit a pull request, your input is valuable to us.
-
-Please refer to our contribution policy first : [How to contribute to Hexabot](https://github.com/Hexastack/Hexabot/blob/main/CONTRIBUTING.md)
+Contributions are welcome. Please read [How to contribute to Hexabot](https://github.com/Hexastack/Hexabot/blob/main/CONTRIBUTING.md) before submitting changes.
 
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/Hexastack/Hexabot/blob/main/CODE_OF_CONDUCT.md)
 
-Feel free to join us on [Discord](https://discord.gg/rNb9t2MFkG)
+Join the Hexabot community on [Discord](https://discord.gg/rNb9t2MFkG).
 
 ## License
 
-This software is licensed under the GNU Affero General Public License v3.0 (AGPLv3) with the following additional terms:
-
-1. The name "Hexabot" is a trademark of Hexastack. You may not use this name in derivative works without express written permission.
-2. All derivative works must include clear attribution to the original creator and software, Hexastack and Hexabot, in a prominent location (e.g., in the software's "About" section, documentation, and README file).
-
----
-
-**_Happy Chatbot Building!_**
+This software is licensed under the Fair Core License, FCL-1.0-ALv2. Full terms are available in [LICENSE.md](./LICENSE.md).

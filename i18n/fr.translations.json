@@ -1,0 +1,22 @@
+{
+  "whatsapp": {
+    "WhatsApp Channel": "Canal WhatsApp",
+    "App secret credential": "Identifiant de la clé secrète de l'application",
+    "Credential containing the Meta app secret used to verify webhook signatures.": "Identifiant contenant la clé secrète de l'application Meta utilisée pour vérifier les signatures des webhooks.",
+    "Access token credential": "Identifiant du jeton d'accès",
+    "Credential containing the WhatsApp Cloud API access token.": "Identifiant contenant le jeton d'accès de l'API WhatsApp Cloud.",
+    "Verify token credential": "Identifiant du jeton de vérification",
+    "Credential containing the token Meta sends during webhook verification.": "Identifiant contenant le jeton envoyé par Meta lors de la vérification du webhook.",
+    "WhatsApp Business Account ID": "ID du compte WhatsApp Business",
+    "Optional WABA ID. When set, webhook entries for other business accounts are ignored.": "ID WABA optionnel. Lorsqu'il est renseigné, les entrées webhook des autres comptes Business sont ignorées.",
+    "Phone number ID": "ID du numéro de téléphone",
+    "Optional WhatsApp Business phone number ID. When set, webhook changes for other phone numbers are ignored.": "ID optionnel du numéro de téléphone WhatsApp Business. Lorsqu'il est renseigné, les changements webhook des autres numéros sont ignorés.",
+    "Graph API version": "Version de l'API Graph",
+    "Graph API version used for WhatsApp Cloud API requests.": "Version de l'API Graph utilisée pour les requêtes WhatsApp Cloud API.",
+    "Thread inactivity (hours)": "Inactivité du fil (heures)",
+    "Automatically start a new thread when the last message is older than this threshold.": "Démarre automatiquement un nouveau fil lorsque le dernier message dépasse ce seuil."
+  },
+  "View More": "Voir plus",
+  "Options": "Options",
+  "Select an option": "Sélectionnez une option"
+}
