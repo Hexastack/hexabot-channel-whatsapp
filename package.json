@@ -1,6 +1,6 @@
 {
   "name": "hexabot-channel-whatsapp",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "WhatsApp Cloud API channel extension for Hexabot v3.",
   "author": "Hexastack",
   "license": "FCL-1.0-ALv2",
